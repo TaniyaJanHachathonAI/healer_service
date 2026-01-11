@@ -1,8 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { LocatorManager } from '../src/utils/locatorManager';
 import { FailureCapture } from '../src/utils/failureCapture';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // Example test file - this shows how to structure your tests
 const locatorManager = new LocatorManager();
