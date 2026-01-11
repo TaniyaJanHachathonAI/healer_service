@@ -1,0 +1,23 @@
+{
+  "logoMark": {
+    "key": "logoMark",
+    "selector": "a[href=\"https://iana.org/domains/example\"]",
+    "selectorType": "css",
+    "description": "Main logo element",
+    "useCase": "Click on logomark wrapper pepsico"
+  },
+  "submitButton": {
+    "key": "submitButton",
+    "selector": "button[type='submit']",
+    "selectorType": "css",
+    "description": "Submit button",
+    "useCase": "Click submit button"
+  },
+  "loginForm": {
+    "key": "loginForm",
+    "selector": "form.login",
+    "selectorType": "css",
+    "description": "Login form container",
+    "useCase": "Fill login form"
+  }
+}
