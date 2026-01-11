@@ -7,7 +7,7 @@ Complete self-healing test automation system with Playwright, integrated fronten
 This system consists of three main components:
 
 1. **Frontend Dashboard** - React-based UI for test execution and healing
-2. **Automation Framework** - Playwright + TypeScript test automation with JSON locator management
+2. **Automation Framework** - Playwright + TypeScript test automation with `test-data/` JSON locator management
 3. **Healer Service** - AI-powered selector healing API (separate repo)
 
 ## Features
@@ -22,7 +22,7 @@ This system consists of three main components:
 
 ### Automation Framework
 - 🎭 **Playwright Integration** - Modern browser automation
-- 📝 **JSON Locator Management** - Store and update selectors dynamically
+- 📝 **JSON Locator Management** - Store and update selectors dynamically in `test-data/`
 - 🔧 **Self-Healing** - Integrate with healer service to fix broken selectors
 - 📸 **Failure Capture** - Automatic screenshots, HTML, and semantic DOM extraction
 - 📊 **Test Reporting** - Comprehensive test execution tracking
@@ -92,7 +92,7 @@ healer_service/
 │   │   ├── testRunner.ts
 │   │   └── server.ts
 │   ├── tests/             # Playwright test files
-│   ├── locators/          # JSON locator files
+│   ├── test-data/         # JSON locator files (new)
 │   └── package.json
 └── README.md
 ```
@@ -102,7 +102,7 @@ healer_service/
 ### 1. Test Execution Flow
 
 1. **From Frontend**: Click "Test Execution" → Select test files → Click "Execute Tests"
-2. **Automation Framework**: Runs Playwright tests using JSON locators
+2. **Automation Framework**: Runs Playwright tests using JSON locators from `test-data/`
 3. **On Failure**: Captures screenshot, HTML, semantic DOM, and creates failure payload
 4. **Frontend**: Displays failed tests with details
 
@@ -111,9 +111,9 @@ healer_service/
 1. **View Failure**: Click "View Details" on a failed test
 2. **Heal Selector**: Click "Heal Selector" button
 3. **Get Suggestions**: Frontend calls automation API → Calls healer service → Returns top 5 CSS + top 5 XPath
-4. **Select Locator**: User selects the best locator from suggestions
+4. **Select Locator**: User selects the best locator from suggestions (Manual or Recommended)
 5. **Update & Re-run**: Click "Update Locator & Re-execute Test"
-6. **Framework**: Updates locator in JSON file → Re-runs test
+6. **Framework**: Updates locator in JSON file (`test-data/`) → Re-runs test
 7. **Result**: Test passes → Marked as healed
 
 ## Failure Payload Structure
@@ -140,14 +140,14 @@ When a test fails, the automation framework captures:
 
 ### Automation Framework API (Port 3001)
 
-- `GET /api/tests/available` - Get available test files
+- `GET /api/tests/available` - Get available test files from `test-data/`
 - `POST /api/tests/execute` - Execute tests
 - `GET /api/tests/execution/:id` - Get execution status
 - `GET /api/failures/:testId` - Get failure details
 - `POST /api/heal` - Heal selector via healer service
-- `POST /api/tests/heal-and-rerun` - Update locator and re-run test
+- `POST /api/tests/heal-and-rerun` - Update locator in `test-data/` and re-run test
 
-### Healer Service API (Port 8000)
+### Healer Service API (Port 9001)
 
 - `POST /heal` - Single selector healing
 - `POST /heal-failure` - Heal from failure payload (returns top 5 CSS + XPath)
@@ -160,13 +160,13 @@ When a test fails, the automation framework captures:
 
 ### Frontend (.env)
 ```bash
-VITE_API_BASE_URL=/api
-VITE_AUTOMATION_API_URL=http://localhost:3001
+VITE_API_BASE_URL=http://127.0.0.1:9001
+VITE_AUTOMATION_API_URL=http://127.0.0.1:3001
 ```
 
 ### Automation Framework
 ```bash
-HEALER_API_URL=http://localhost:8000
+HEALER_API_URL=http://127.0.0.1:9001
 PORT=3001
 HEADLESS=true
 ```
@@ -175,13 +175,13 @@ HEADLESS=true
 
 ### Running All Services
 
-1. Start Healer Service (port 8000)
+1. Start Healer Service (port 9001)
 2. Start Automation Framework: `cd automation && npm run dev`
 3. Start Frontend: `cd frontend && npm run dev`
 
 ### Creating Tests
 
-1. Create locator JSON file in `automation/locators/`
+1. Create locator JSON file in `automation/test-data/`
 2. Create test file in `automation/tests/`
 3. Use `LocatorManager` to load locators
 4. Tests will automatically capture failures

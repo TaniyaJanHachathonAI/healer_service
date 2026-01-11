@@ -22,7 +22,7 @@ npm install
 Set environment variables:
 
 ```bash
-HEALER_API_URL=http://localhost:8000  # Healer service API URL
+HEALER_API_URL=http://127.0.0.1:9001  # Healer service API URL
 PORT=3001                              # Automation framework server port
 HEADLESS=true                          # Run browser in headless mode
 ```
@@ -40,7 +40,7 @@ automation/
 │   ├── testRunner.ts       # Test execution engine
 │   └── server.ts           # Express API server
 ├── tests/                  # Playwright test files
-├── locators/               # JSON locator files
+├── test-data/              # JSON locator files (New)
 │   └── example.json
 ├── test-results/           # Test results, screenshots, failures
 ├── playwright.config.ts
@@ -51,7 +51,7 @@ automation/
 
 ### 1. Define Locators
 
-Create JSON files in `locators/` directory:
+Create JSON files in `test-data/` directory:
 
 ```json
 {

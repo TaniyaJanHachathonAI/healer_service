@@ -5,7 +5,7 @@ import type { LocatorData, LocatorsFile } from '../types';
 export class LocatorManager {
   private locatorsPath: string;
 
-  constructor(locatorsPath: string = path.join(__dirname, '../../locators')) {
+  constructor(locatorsPath: string = path.join(__dirname, '../../test-data')) {
     this.locatorsPath = locatorsPath;
     this.ensureDirectoryExists();
   }
@@ -51,6 +51,40 @@ export class LocatorManager {
   getLocator(fileName: string, key: string): LocatorData | null {
     const locators = this.loadLocators(fileName);
     return locators[key] || null;
+  }
+
+  /**
+   * Update a locator by matching its old selector value
+   */
+  updateLocatorBySelector(
+    fileName: string,
+    oldSelector: string,
+    newSelector: string,
+    newType: 'css' | 'xpath' = 'css'
+  ): void {
+    const locators = this.loadLocators(fileName);
+    let found = false;
+
+    console.log(`Searching for old selector: "${oldSelector}" in ${fileName}.json`);
+
+    for (const key in locators) {
+      if (locators[key].selector === oldSelector) {
+        locators[key].selector = newSelector;
+        locators[key].selectorType = newType;
+        found = true;
+        console.log(`Updated locator key "${key}" in ${fileName}.json (matched by selector value)`);
+        break;
+      }
+    }
+
+    if (!found) {
+      console.warn(`No exact match for selector "${oldSelector}" in ${fileName}.json`);
+      // Fallback: if there's only one entry in the file and it's a test file with 1 element, update it anyway?
+      // No, let's be strict but informative.
+      throw new Error(`Could not find locator with value "${oldSelector}" in ${fileName}.json to update.`);
+    }
+
+    this.saveLocators(fileName, locators);
   }
 
   /**

@@ -11,32 +11,29 @@ export async function runDemoTest(page: Page, locators: any) {
   console.log(`Checking logo visibility using "${logoKey}" (${logoSelector})...`);
   
   try {
-    const logo = page.locator(logoSelector);
+    const logo = page.locator(logoSelector).nth(0);
     await expect(logo).toBeVisible({ timeout: 5000 });
     console.log('Logo is visible!');
   } catch (e: any) {
     console.warn(`Logo check failed for "${logoKey}". This might be expected if the site changed.`);
-    e.message = `[LocatorKey:${logoKey}] Logo not visible with selector "${logoSelector}". ${e.message}`;
+    // Note: No explicit marker needed anymore as we match by selector value!
     throw e;
   }
   
-  // 2. Healing case: Attempt to click the broken element
-  const key = 'brokenElement';
-  const selector = locators[key]?.selector || '.non-existent-fallback';
+  // // 2. Healing case: Attempt to click the broken element
+  // const key = 'brokenElement';
+  // const selector = locators[key]?.selector || '.non-existent-fallback';
   
-  console.log(`Attempting to click "${key}" with selector: ${selector}`);
+  // console.log(`Attempting to click using selector: ${selector}`);
   
-  try {
-    // We use a shorter timeout for the demo so healing happens faster
-    await page.locator(selector).click({ timeout: 5000 });
-    console.log('Successfully clicked the element!');
-  } catch (e: any) {
-    // CRITICAL: We enrich the error message with the locator key 
-    // so our framework can identify which JSON key needs to be healed.
-    e.message = `[LocatorKey:${key}] Failed to click element with selector "${selector}". Error: ${e.message}`;
-    console.error('Test failed as expected, triggering healing flow...');
-    throw e;
-  }
+  // try {
+  //   // We use a shorter timeout for the demo so healing happens faster
+  //   await page.locator(selector).click({ timeout: 5000 });
+  //   console.log('Successfully clicked the element!');
+  // } catch (e: any) {
+  //   console.error('Test failed, triggering healing flow...');
+  //   throw e;
+  // }
 }
 
 // Support for different export names to be more robust

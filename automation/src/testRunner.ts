@@ -188,21 +188,32 @@ export class TestRunner {
     selectedSelector: string,
     selectorType: 'css' | 'xpath'
   ): Promise<TestResult> {
-    if (!failedResult.failure?.payload?.locator_key) {
-      throw new Error('Cannot heal: locator key not found in failure payload');
+    if (!failedResult.failure?.payload?.failed_selector) {
+      throw new Error('Cannot heal: failed selector not found in failure payload');
     }
 
-    const locatorKey = failedResult.failure.payload.locator_key;
+    const oldSelector = failedResult.failure.payload.failed_selector;
     const locatorFile = testCase.locatorFile;
 
-    // Update locator
-    this.locatorManager.updateLocator(locatorFile, locatorKey, selectedSelector, selectorType);
+    // Update locator by value matching
+    this.locatorManager.updateLocatorBySelector(locatorFile, oldSelector, selectedSelector, selectorType);
+
+    // Wait for 3 seconds to ensure file system sync and give visual pause
+    console.log('Waiting 3 seconds before re-executing test...');
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Re-run test
     const healedResult = await this.runTest(testCase);
 
     if (healedResult.status === 'passed') {
       healedResult.status = 'healed';
+      // Store which locator was used for the pass
+      healedResult.failure = {
+        error: '',
+        payload: failedResult.failure!.payload,
+        healed: true,
+        selectedLocator: selectedSelector
+      };
     }
 
     return healedResult;

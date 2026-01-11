@@ -62,7 +62,7 @@ app.get('/health', (req, res) => {
  */
 app.get('/api/tests/available', (req, res) => {
   try {
-    const locatorsDir = path.join(__dirname, '../locators');
+    const locatorsDir = path.join(__dirname, '../test-data');
     const fs = require('fs').promises;
     const fsSync = require('fs');
     

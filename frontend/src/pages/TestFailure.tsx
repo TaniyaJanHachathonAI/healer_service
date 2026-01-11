@@ -99,15 +99,17 @@ const TestFailure = () => {
     }
 
     try {
-      await apiService.healAndRerun({
+      const response = await apiService.healAndRerun({
         executionId,
         testId: testId!,
         selectedSelector,
         selectorType,
       });
 
-      alert('Locator updated successfully! Test will be re-executed.');
-      navigate(`/test-execution/${executionId}`);
+      alert('Locator updated successfully! Test was re-executed.');
+      // Navigate to the NEW execution ID returned by the server
+      const newId = response.execution?.id || executionId;
+      navigate(`/test-execution/${newId}`);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to heal and re-run test');
       console.error('Error healing and re-running:', err);
@@ -284,13 +286,32 @@ const TestFailure = () => {
                       ? selector['Suggested Selector'] 
                       : selector.XPath;
                     const isSelected = selectedSelector === selectorValue;
+                    const isRecommended = (selectorType === 'css' && healingResponse.auto_selected?.css === selectorValue) ||
+                                         (selectorType === 'xpath' && healingResponse.auto_selected?.xpath === selectorValue);
 
                     return (
                       <div
                         key={index}
                         className={`selector-item ${isSelected ? 'selected' : ''}`}
                         onClick={() => handleSelectSelector(selectorValue, selectorType)}
+                        style={{ position: 'relative' }}
                       >
+                        {isRecommended && (
+                          <span className="recommended-badge" style={{ 
+                            position: 'absolute', 
+                            top: '12px', 
+                            right: '12px', 
+                            background: '#ebf8ff', 
+                            color: '#2b6cb0', 
+                            fontSize: '10px', 
+                            fontWeight: '700', 
+                            padding: '2px 8px', 
+                            borderRadius: '4px',
+                            border: '1px solid #bee3f8'
+                          }}>
+                            ⭐ RECOMMENDED
+                          </span>
+                        )}
                         <div className="selector-item-header">
                           <span className="selector-rank">#{selector.RankIndex}</span>
                           <span className="selector-score">Score: {(selector.Score * 100).toFixed(1)}%</span>
