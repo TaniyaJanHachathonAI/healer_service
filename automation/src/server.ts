@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import * as path from 'path';
+import * as fs from 'fs';
 import { TestRunner, TestCase } from './testRunner';
 import { LocatorManager } from './utils/locatorManager';
 import { FailureCapture } from './utils/failureCapture';
@@ -9,6 +10,12 @@ import type { TestExecution, FailurePayload, HealingResponse } from './types';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const REPORTS_DIR = path.join(__dirname, '../test-results/reports');
+
+// Ensure reports directory exists
+if (!fs.existsSync(REPORTS_DIR)) {
+  fs.mkdirSync(REPORTS_DIR, { recursive: true });
+}
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -23,6 +30,25 @@ const healerClient = new HealerClient(process.env.HEALER_API_URL);
 // Store active executions and their test case logic
 const activeExecutions = new Map<string, TestExecution>();
 const executionTestCases = new Map<string, TestCase[]>();
+
+/**
+ * Helper to save report to disk
+ */
+const saveReport = (execution: TestExecution) => {
+  const filePath = path.join(REPORTS_DIR, `${execution.id}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(execution, null, 2));
+};
+
+/**
+ * Helper to load report from disk
+ */
+const loadReport = (id: string): TestExecution | null => {
+  const filePath = path.join(REPORTS_DIR, `${id}.json`);
+  if (fs.existsSync(filePath)) {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  }
+  return null;
+};
 
 /**
  * Health check endpoint
@@ -70,21 +96,32 @@ app.post('/api/tests/execute', async (req, res) => {
       process.env.HEADLESS = headless ? 'true' : 'false';
     }
 
-    // This is a simplified version - in real implementation,
-    // you would load actual test cases from test files
-    const testCasesToRun: TestCase[] = testFiles.map((testFile: string) => ({
-      name: testFile,
-      locatorFile: testFile,
-      testFunction: async (page: any, locators: any) => {
-        // Mock test function - replace with actual test logic
-        // This should be loaded from actual test files
-        throw new Error('Mock test - implement actual test cases');
-      },
-    }));
+    // Load actual test case functions if available
+    const testCasesToRun: TestCase[] = testFiles.map((testFile: string) => {
+      const baseCase: TestCase = {
+        name: `Test for ${testFile}`,
+        locatorFile: testFile,
+        testFunction: async (page: any, locators: any) => {
+          throw new Error(`Test logic for ${testFile} not implemented. Try using the 'demo' script.`);
+        },
+      };
+
+      // Special case for demo script
+      if (testFile === 'demo') {
+        baseCase.name = 'Healing Demo Test';
+        baseCase.testFunction = async (page: any, locators: any) => {
+          const { runDemoTest } = await import('../tests/demo.spec');
+          await runDemoTest(page, locators);
+        };
+      }
+
+      return baseCase;
+    });
 
     const execution = await testRunner.runTests(testCasesToRun);
     activeExecutions.set(execution.id, execution);
     executionTestCases.set(execution.id, testCasesToRun);
+    saveReport(execution);
 
     res.json(execution);
   } catch (error: any) {
@@ -94,11 +131,40 @@ app.post('/api/tests/execute', async (req, res) => {
 });
 
 /**
+ * Get all reports
+ */
+app.get('/api/reports', (req, res) => {
+  try {
+    const files = fs.readdirSync(REPORTS_DIR)
+      .filter(file => file.endsWith('.json'));
+    
+    const reports = files.map(file => {
+      const content = fs.readFileSync(path.join(REPORTS_DIR, file), 'utf-8');
+      const execution = JSON.parse(content) as TestExecution;
+      return {
+        id: execution.id,
+        status: execution.status,
+        startTime: execution.startTime,
+        endTime: execution.endTime,
+        totalTests: execution.totalTests,
+        passedTests: execution.passedTests,
+        failedTests: execution.failedTests,
+        healedTests: execution.healedTests
+      };
+    }).sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+
+    res.json(reports);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Get execution status
  */
 app.get('/api/tests/execution/:id', (req, res) => {
   const { id } = req.params;
-  const execution = testRunner.getExecution(id) || activeExecutions.get(id);
+  const execution = activeExecutions.get(id) || loadReport(id);
 
   if (!execution) {
     return res.status(404).json({ error: 'Execution not found' });
@@ -196,6 +262,7 @@ app.post('/api/tests/heal-and-rerun', async (req, res) => {
       execution.passedTests = execution.results.filter(r => r.status === 'passed').length;
       execution.failedTests = execution.results.filter(r => r.status === 'failed').length;
       execution.healedTests = execution.results.filter(r => r.status === 'healed').length;
+      saveReport(execution);
     }
 
     res.json({
