@@ -87,14 +87,32 @@ export class TestRunner {
       
       // Try to extract locator key from error if possible
       const locatorKey = this.extractLocatorKey(errorMessage, testCase.locatorFile);
-      const failedSelector = locatorKey 
+      
+      // 1. Get selector from locator manager if key found
+      let failedSelector = locatorKey 
         ? this.locatorManager.getLocator(testCase.locatorFile, locatorKey)?.selector || ''
         : '';
 
+      // 2. If no key/selector found, try to extract actual selector from Playwright error
+      if (!failedSelector) {
+        const selectorMatch = errorMessage.match(/waiting for locator\(['"](.+?)['"]\)/i) || 
+                              errorMessage.match(/locator\(['"](.+?)['"]\)/i);
+        if (selectorMatch) {
+          failedSelector = selectorMatch[1];
+          console.log(`Extracted raw selector from error: ${failedSelector}`);
+        }
+      }
+
+      // 3. Fallback: use the whole error message as context if still empty (not ideal but better than empty)
+      if (!failedSelector && errorMessage.length > 5) {
+        console.warn('Could not identify specific failed selector. Using error snippet.');
+        failedSelector = errorMessage.split('\n')[0].substring(0, 100);
+      }
+
       const payload = await this.failureCapture.captureFailure(
         page,
-        failedSelector,
-        testCase.name,
+        failedSelector || 'Unknown Selector',
+        errorMessage, // Use error message as "use of selector" for more context
         testCase.name,
         locatorKey || ''
       );
@@ -143,7 +161,7 @@ export class TestRunner {
 
       const execution: TestExecution = {
         id: executionId,
-        status: 'completed',
+        status: results.some(r => r.status === 'failed') ? 'failed' : 'completed',
         startTime,
         endTime: new Date().toISOString(),
         results,
@@ -198,15 +216,23 @@ export class TestRunner {
   }
 
   /**
-   * Extract locator key from error message (heuristic)
+   * Extract locator key from error message (heuristic + explicit markers)
    */
   private extractLocatorKey(errorMessage: string, locatorFile: string): string | null {
-    // Try to match common Playwright error patterns
-    // This is a simple heuristic - can be improved
+    // 1. Check for explicit marker [LocatorKey:keyName]
+    const markerMatch = errorMessage.match(/\[LocatorKey:(\w+)\]/);
+    if (markerMatch) {
+      console.log(`Found explicit locator key: ${markerMatch[1]}`);
+      return markerMatch[1];
+    }
+
+    // 2. Fallback: Try to match keys from the locator file in the error message
     const locatorKeys = this.locatorManager.getLocatorKeys(locatorFile);
     
     for (const key of locatorKeys) {
-      if (errorMessage.toLowerCase().includes(key.toLowerCase())) {
+      if (errorMessage.includes(`"${key}"`) || 
+          errorMessage.includes(`'${key}'`) || 
+          errorMessage.toLowerCase().includes(key.toLowerCase())) {
         return key;
       }
     }

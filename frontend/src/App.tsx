@@ -15,6 +15,7 @@ function App() {
           <Route path="/test-execution" element={<TestExecution />} />
           <Route path="/test-execution/:executionId" element={<TestExecution />} />
           <Route path="/test-failures/:testId" element={<TestFailure />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="/reports/:executionId" element={<Reports />} />
         </Routes>
       </Layout>

@@ -99,22 +99,43 @@ app.post('/api/tests/execute', async (req, res) => {
     // Load actual test case functions if available
     const testCasesToRun: TestCase[] = testFiles.map((testFile: string) => {
       const baseCase: TestCase = {
-        name: `Test for ${testFile}`,
+        name: `Test: ${testFile}`,
         locatorFile: testFile,
         testFunction: async (page: any, locators: any) => {
-          throw new Error(`Test logic for ${testFile} not implemented. Try using the 'demo' script.`);
+          try {
+            // Find the spec file in src/tests
+            const testDir = path.join(__dirname, 'tests');
+            const possibleFiles = [`${testFile}.spec.ts`, `${testFile}.test.ts`, `${testFile}.ts`];
+            let actualFile = '';
+            
+            for (const f of possibleFiles) {
+              if (fs.existsSync(path.join(testDir, f))) {
+                actualFile = f;
+                break;
+              }
+            }
+
+            if (!actualFile) {
+              throw new Error(`Test logic file for "${testFile}" not found in ${testDir}`);
+            }
+
+            // Import using absolute path for reliability with tsx
+            const testPath = path.join(testDir, actualFile);
+            const testModule = await import(testPath);
+            const testFn = testModule.runDemoTest || testModule.runExampleTest || testModule.default || testModule.test;
+            
+            if (testFn) {
+              console.log(`Running dynamic test logic from ${actualFile}...`);
+              await testFn(page, locators);
+            } else {
+              throw new Error(`No exported test function found in ${actualFile}. Export 'runDemoTest', 'runExampleTest', 'test', or use a default export.`);
+            }
+          } catch (e: any) {
+            console.error(`Dynamic test execution failed for "${testFile}":`, e.message);
+            throw e;
+          }
         },
       };
-
-      // Special case for demo script
-      if (testFile === 'demo') {
-        baseCase.name = 'Healing Demo Test';
-        baseCase.testFunction = async (page: any, locators: any) => {
-          const { runDemoTest } = await import('../tests/demo.spec');
-          await runDemoTest(page, locators);
-        };
-      }
-
       return baseCase;
     });
 
@@ -122,6 +143,13 @@ app.post('/api/tests/execute', async (req, res) => {
     activeExecutions.set(execution.id, execution);
     executionTestCases.set(execution.id, testCasesToRun);
     saveReport(execution);
+
+    // Provide dynamic logging of the payload passed to the healer
+    console.log('Execution completed. Metadata captured:', {
+      totalTests: execution.totalTests,
+      failedTests: execution.failedTests,
+      reportPath: path.join(REPORTS_DIR, `${execution.id}.json`)
+    });
 
     res.json(execution);
   } catch (error: any) {
@@ -202,13 +230,50 @@ app.get('/api/failures/:testId', (req, res) => {
  */
 app.post('/api/heal', async (req, res) => {
   try {
-    const { payload } = req.body as { payload: FailurePayload };
+    const { payload, options } = req.body as { payload: FailurePayload, options?: any };
 
     if (!payload) {
       return res.status(400).json({ error: 'Payload is required' });
     }
 
-    const healingResponse = await healerClient.healSelector(payload);
+    console.log(`Sending healing request to Python Service for selector: ${payload.failed_selector}`);
+    const rawResponse = await healerClient.healSelector(payload, options || {});
+    
+    console.log('Raw response from Python Healer:', JSON.stringify(rawResponse).substring(0, 500) + '...');
+
+    // Transform Python service response to UI expected format
+    // Alignment with healer_service-main/main.py:build_custom_heal_response
+    const candidates = rawResponse.candidates || [];
+    
+    if (candidates.length === 0) {
+      console.warn('No healing candidates returned from Python service.');
+    }
+
+    const css_selectors = candidates.map((c: any, index: number) => ({
+      RankIndex: index + 1,
+      Score: c.score || 0,
+      BaseSim: c.base_score || 0,
+      AttrScore: c.attribute_score || 0,
+      Tag: c.tag || '',
+      Text: c.text || '',
+      Role: c.role || '', // Added role if available
+      'Suggested Selector': c.selector || '',
+      XPath: c.xpath || '',
+    }));
+
+    const healingResponse: HealingResponse = {
+      css_selectors: css_selectors,
+      xpath_selectors: css_selectors.filter((c: any) => c.XPath).map((c: any) => ({
+        ...c,
+        'Suggested Selector': c.XPath 
+      })),
+      auto_selected: {
+        css: rawResponse.chosen || (css_selectors[0] ? css_selectors[0]['Suggested Selector'] : undefined),
+        xpath: css_selectors.find((c: any) => c.XPath)?.XPath || undefined
+      }
+    };
+
+    console.log(`Transformed response sent to UI: ${css_selectors.length} CSS, ${healingResponse.xpath_selectors.length} XPath selectors`);
     res.json(healingResponse);
   } catch (error: any) {
     console.error('Error healing selector:', error);
@@ -238,12 +303,56 @@ app.post('/api/tests/heal-and-rerun', async (req, res) => {
     }
 
     // Get the test case logic
-    const testCases = executionTestCases.get(executionId);
+    let testCases = executionTestCases.get(executionId);
+    
+    // If not in memory (server restart), try to reconstruct from report on disk
+    if (!testCases) {
+      const savedExecution = loadReport(executionId.replace(/^re-/, '')); // strip re- prefix if any
+      if (savedExecution) {
+        console.log(`Reconstructing test cases for execution ${executionId} from saved report`);
+        const reconstructedCases: TestCase[] = savedExecution.results.map(r => ({
+          name: r.testName,
+          locatorFile: r.testName.replace('Test: ', ''),
+          testFunction: async (page: any, locators: any) => {
+            const testFile = r.testName.replace('Test: ', '');
+            const testDir = path.join(__dirname, 'tests');
+            const possibleFiles = [`${testFile}.spec.ts`, `${testFile}.test.ts`, `${testFile}.ts`];
+            let actualFile = '';
+            
+            for (const f of possibleFiles) {
+              if (fs.existsSync(path.join(testDir, f))) {
+                actualFile = f;
+                break;
+              }
+            }
+
+            if (!actualFile) {
+              throw new Error(`Test logic file for "${testFile}" not found. Please ensure it exists in ${testDir}`);
+            }
+
+            const testPath = path.join(testDir, actualFile);
+            const testModule = await import(testPath);
+            const testFn = testModule.runDemoTest || testModule.runExampleTest || testModule.default || testModule.test;
+            
+            if (testFn) {
+              await testFn(page, locators);
+            } else {
+              throw new Error(`No exported test function found in ${actualFile}.`);
+            }
+          }
+        }));
+        executionTestCases.set(executionId, reconstructedCases);
+        testCases = reconstructedCases;
+      }
+    }
+
     const testCase = testCases?.find(tc => tc.name === failedResult.testName);
 
     if (!testCase) {
       return res.status(404).json({ error: 'Test case logic not found for re-execution' });
     }
+
+    console.log(`Re-executing test "${failedResult.testName}" with healed locator: "${selectedSelector}" (${selectorType})`);
 
     // Perform healing and re-run
     const healedResult = await testRunner.healAndRerun(
@@ -253,23 +362,32 @@ app.post('/api/tests/heal-and-rerun', async (req, res) => {
       selectorType || 'css'
     );
 
-    // Update the execution record
-    const resultIndex = execution.results.findIndex(r => r.id === testId);
-    if (resultIndex !== -1) {
-      execution.results[resultIndex] = healedResult;
-      
-      // Update summary counts
-      execution.passedTests = execution.results.filter(r => r.status === 'passed').length;
-      execution.failedTests = execution.results.filter(r => r.status === 'failed').length;
-      execution.healedTests = execution.results.filter(r => r.status === 'healed').length;
-      saveReport(execution);
-    }
+    console.log(`Re-execution completed. Status: ${healedResult.status}`);
+
+    // Create a new execution session for the re-run to keep history
+    const reExecution: TestExecution = {
+      ...execution,
+      id: `re-${Date.now()}-${execution.id}`,
+      startTime: new Date().toISOString(),
+      results: execution.results.map(r => r.id === testId ? healedResult : r),
+    };
+
+    // Update counts
+    reExecution.passedTests = reExecution.results.filter(r => r.status === 'passed').length;
+    reExecution.failedTests = reExecution.results.filter(r => r.status === 'failed').length;
+    reExecution.healedTests = reExecution.results.filter(r => r.status === 'healed').length;
+    reExecution.status = reExecution.failedTests > 0 ? 'failed' : 'completed';
+    reExecution.endTime = new Date().toISOString();
+
+    activeExecutions.set(reExecution.id, reExecution);
+    executionTestCases.set(reExecution.id, testCases || []); // Link test logic to new ID
+    saveReport(reExecution);
 
     res.json({
       message: 'Test re-executed successfully',
       testId,
       result: healedResult,
-      execution
+      execution: reExecution
     });
   } catch (error: any) {
     console.error('Error in heal-and-rerun:', error);
@@ -293,5 +411,5 @@ app.get('/screenshots/:filename', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Automation Framework Server running on http://localhost:${PORT}`);
-  console.log(`Healer API URL: ${process.env.HEALER_API_URL || 'http://localhost:8000'}`);
+  console.log(`Healer API URL: ${process.env.HEALER_API_URL || 'http://localhost:9001'}`);
 });

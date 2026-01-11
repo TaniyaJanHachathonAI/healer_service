@@ -4,7 +4,7 @@ import type { FeedbackRequest, HistoryEntry } from '../types';
 import './Feedback.css';
 
 const Feedback = () => {
-  const [healingId, setHealingId] = useState('');
+  const [healingId, setHealingId] = useState<number | ''>('');
   const [feedbackType, setFeedbackType] = useState<'positive' | 'negative' | null>(null);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ const Feedback = () => {
       setLoadingHistory(true);
       try {
         const data = await apiService.getHistory({ page: 1, page_size: 10 });
-        setRecentHistory(data.entries);
+        setRecentHistory(data.items); // HistoryResponse has 'items'
       } catch (err) {
         console.error('Error fetching recent history:', err);
       } finally {
@@ -41,7 +41,7 @@ const Feedback = () => {
       return;
     }
 
-    if (!healingId.trim()) {
+    if (healingId === '') {
       setError('Please enter a healing ID');
       setLoading(false);
       return;
@@ -49,8 +49,8 @@ const Feedback = () => {
 
     try {
       const request: FeedbackRequest = {
-        healing_id: healingId.trim(),
-        feedback_type: feedbackType,
+        healing_id: Number(healingId),
+        rating: feedbackType,
       };
       if (comment.trim()) {
         request.comment = comment.trim();
@@ -99,10 +99,10 @@ const Feedback = () => {
             Healing ID <span className="required">*</span>
           </label>
           <input
-            type="text"
+            type="number"
             className="form-input"
             value={healingId}
-            onChange={(e) => setHealingId(e.target.value)}
+            onChange={(e) => setHealingId(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="Enter the healing ID from your history"
             required
           />
@@ -126,9 +126,11 @@ const Feedback = () => {
                     }}
                   >
                     <div style={{ fontSize: '12px', fontWeight: 600, color: '#1a202c', marginBottom: '4px' }}>
-                      {entry.id}
+                      ID: {entry.id}
                     </div>
-                    <div className="history-selector">{entry.original_selector} → {entry.healed_selector}</div>
+                    <div className="history-selector" style={{ fontSize: '11px', color: '#4a5568', wordBreak: 'break-all' }}>
+                      {entry.old_selector.substring(0, 40)}... → {entry.new_selector.substring(0, 40)}...
+                    </div>
                   </div>
                 ))}
               </div>
@@ -172,7 +174,7 @@ const Feedback = () => {
         </div>
 
         <div className="button-group">
-          <button type="submit" className="btn btn-primary" disabled={loading || !feedbackType || !healingId.trim()}>
+          <button type="submit" className="btn btn-primary" disabled={loading || !feedbackType || healingId === ''}>
             {loading ? '⏳ Submitting...' : '💬 Submit Feedback'}
           </button>
           <button

@@ -71,7 +71,7 @@ export class LocatorManager {
     locators[key] = {
       ...locators[key],
       selector,
-      selectorType,
+      selectorType: (selectorType as 'css' | 'xpath'),
     };
 
     this.saveLocators(fileName, locators);
