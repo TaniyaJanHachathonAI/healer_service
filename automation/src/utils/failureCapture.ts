@@ -27,38 +27,76 @@ export class FailureCapture {
   /**
    * Extract semantic DOM data (interactive elements only)
    */
-  private async extractSemanticDOM(page: Page): Promise<string> {
+  private async extractSemanticDOM(page: Page): Promise<any> {
     return await page.evaluate(() => {
       const interactiveElements = [
         'a', 'button', 'input', 'select', 'textarea',
         '[role="button"]', '[role="link"]', '[role="tab"]',
-        '[onclick]', '[tabindex]'
+        '[role="menuitem"]', '[role="checkbox"]', '[role="radio"]',
+        '[onclick]', '[tabindex]', '[contenteditable="true"]',
+        'nav', 'form', 'label'
       ];
 
       const elements = document.querySelectorAll(interactiveElements.join(','));
-      const semanticData: Array<{
-        tag: string;
-        text: string;
-        attributes: Record<string, string>;
-        role?: string;
-        xpath?: string;
-      }> = [];
+      const semanticData: any[] = [];
 
-      elements.forEach((el) => {
+      elements.forEach((el: any) => {
+        // Get bounding box for vision alignment
+        const rect = el.getBoundingClientRect();
+        
+        // Skip hidden elements
+        if (rect.width === 0 || rect.height === 0 || window.getComputedStyle(el).display === 'none') {
+          return;
+        }
+
         const attributes: Record<string, string> = {};
-        Array.from(el.attributes).forEach(attr => {
+        Array.from(el.attributes).forEach((attr: any) => {
           attributes[attr.name] = attr.value;
         });
 
         semanticData.push({
           tag: el.tagName.toLowerCase(),
-          text: (el.textContent || '').trim().substring(0, 100),
+          text: (el.textContent || '').trim().substring(0, 150),
+          accessible_name: el.getAttribute('aria-label') || el.getAttribute('title') || el.innerText || '',
+          role: el.getAttribute('role') || el.tagName.toLowerCase(),
           attributes,
-          role: el.getAttribute('role') || undefined,
+          id: el.id,
+          classes: Array.from(el.classList),
+          bounds: {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height
+          },
+          // Basic XPath for fallback
+          xpath: (() => {
+            const parts = [];
+            let current: any = el;
+            while (current && current.nodeType === 1) {
+              let index = 0;
+              let sibling = current.previousSibling;
+              while (sibling) {
+                if (sibling.nodeType === 1 && sibling.tagName === current.tagName) {
+                  index++;
+                }
+                sibling = sibling.previousSibling;
+              }
+              const tagName = current.tagName.toLowerCase();
+              const pathIndex = index > 0 ? `[${index + 1}]` : '';
+              parts.unshift(`${tagName}${pathIndex}`);
+              current = current.parentNode;
+            }
+            return parts.length ? `/${parts.join('/')}` : '';
+          })()
         });
       });
 
-      return JSON.stringify(semanticData, null, 2);
+      return {
+        type: 'semantic_dom',
+        timestamp: new Date().toISOString(),
+        total_elements: semanticData.length,
+        elements: semanticData
+      };
     });
   }
 

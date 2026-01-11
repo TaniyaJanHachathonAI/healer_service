@@ -35,49 +35,50 @@ export interface BatchHealResponse {
 }
 
 export interface HistoryEntry {
-  id: string;
-  original_selector: string;
-  healed_selector: string;
+  id: number;
+  old_selector: string;
+  new_selector: string;
   confidence: number;
-  stability_score?: number;
-  semantic_score?: number;
-  method: string;
-  processing_time_ms?: number;
+  url: string;
   timestamp: string;
-  url?: string;
+  feedback_rating?: 'positive' | 'negative';
+  feedback_comment?: string;
 }
 
 export interface HistoryResponse {
-  entries: HistoryEntry[];
-  total: number;
+  items: HistoryEntry[];
+  total_count: number;
   page: number;
   page_size: number;
+  has_more: boolean;
 }
 
 export interface StatsResponse {
   total_healings: number;
-  success_rate: number;
-  average_confidence: number;
-  average_processing_time_ms: number;
-  total_feedback: number;
+  total_with_feedback: number;
   positive_feedback_count: number;
-  methods_used: Record<string, number>;
-  recent_activity: Array<{
-    date: string;
+  negative_feedback_count: number;
+  success_rate: number;
+  most_healed_selectors: Array<{
+    selector: string;
     count: number;
   }>;
+  recent_healings_count: number;
+  average_confidence: number;
 }
 
 export interface FeedbackRequest {
-  healing_id: string;
-  feedback_type: 'positive' | 'negative';
+  healing_id: number;
+  rating: 'positive' | 'negative';
   comment?: string;
+  actual_selector_used?: string;
 }
 
 export interface HealthResponse {
   status: 'healthy' | 'degraded' | 'unhealthy';
-  database: 'connected' | 'disconnected';
-  llm_available: boolean;
+  database_connected: boolean;
+  llm_api_available: boolean;
+  timestamp: string;
   version?: string;
 }
 
@@ -85,7 +86,7 @@ export interface HealthResponse {
 export interface FailurePayload {
   failed_selector: string;
   html: string;
-  semantic_dom: string;
+  semantic_dom: any;
   use_of_selector: string;
   full_coverage: boolean;
   page_url: string;

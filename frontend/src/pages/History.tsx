@@ -75,9 +75,9 @@ const History = () => {
     return 'confidence-low';
   };
 
-  const totalPages = history ? Math.ceil(history.total / history.page_size) : 0;
+  const totalPages = history ? Math.ceil(history.total_count / history.page_size) : 0;
   const startItem = history ? (history.page - 1) * history.page_size + 1 : 0;
-  const endItem = history ? Math.min(history.page * history.page_size, history.total) : 0;
+  const endItem = history ? Math.min(history.page * history.page_size, history.total_count) : 0;
 
   return (
     <div className="history">
@@ -137,7 +137,7 @@ const History = () => {
 
       {loading ? (
         <div className="loading">Loading history...</div>
-      ) : history && history.entries.length > 0 ? (
+      ) : history && history.items.length > 0 ? (
         <>
           <div className="history-table-card">
             <table className="history-table">
@@ -145,36 +145,32 @@ const History = () => {
                 <tr>
                   <th>Selectors</th>
                   <th>Confidence</th>
-                  <th>Method</th>
-                  <th>Metrics</th>
                   <th>Timestamp</th>
+                  <th>Details</th>
                 </tr>
               </thead>
               <tbody>
-                {history.entries.map((entry: HistoryEntry) => (
+                {history.items.map((entry: HistoryEntry) => (
                   <tr key={entry.id}>
                     <td className="selector-cell">
-                      <div className="original">{entry.original_selector}</div>
-                      <div className="healed">{entry.healed_selector}</div>
+                      <div className="original" title="Broken selector">{entry.old_selector}</div>
+                      <div className="healed" title="Healed selector">{entry.new_selector}</div>
                     </td>
                     <td className={`confidence-cell ${getConfidenceClass(entry.confidence)}`}>
                       {(entry.confidence * 100).toFixed(1)}%
                     </td>
-                    <td>
-                      <span className="method-badge">{entry.method}</span>
-                    </td>
-                    <td className="metrics-cell">
-                      {entry.stability_score !== undefined && (
-                        <div>Stability: {(entry.stability_score * 100).toFixed(1)}%</div>
-                      )}
-                      {entry.semantic_score !== undefined && (
-                        <div>Semantic: {(entry.semantic_score * 100).toFixed(1)}%</div>
-                      )}
-                      {entry.processing_time_ms !== undefined && (
-                        <div>Time: {entry.processing_time_ms.toFixed(0)}ms</div>
-                      )}
-                    </td>
                     <td className="timestamp-cell">{formatDate(entry.timestamp)}</td>
+                    <td className="metrics-cell">
+                      <div style={{ fontSize: '11px', color: '#718096' }}>ID: {entry.id}</div>
+                      <div style={{ fontSize: '11px', color: '#718096', wordBreak: 'break-all' }}>
+                        URL: <a href={entry.url} target="_blank" rel="noreferrer">{new URL(entry.url).hostname}</a>
+                      </div>
+                      {entry.feedback_rating && (
+                        <div className={`feedback-badge ${entry.feedback_rating}`}>
+                          {entry.feedback_rating === 'positive' ? '👍' : '👎'}
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -183,7 +179,7 @@ const History = () => {
 
           <div className="pagination">
             <div className="pagination-info">
-              Showing {startItem} to {endItem} of {history.total} entries
+              Showing {startItem} to {endItem} of {history.total_count} entries
             </div>
             <div className="pagination-controls">
               <button

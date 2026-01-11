@@ -27,6 +27,7 @@ from xpath_generator import (
 from vision_analyzer import get_visual_context_for_healing, analyze_screenshot_with_vision
 from dom_extractor import DOMExtractor
 from matching_engine  import MatchingEngine
+from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import pandas as pd
 import re, json, os
@@ -34,6 +35,15 @@ app = FastAPI(
     title="Selector Healer Service",
     description="AI-powered selector healing service for test automation",
     version="1.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, specify your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ============================================================================
@@ -905,4 +915,4 @@ async def submit_feedback(req: FeedbackRequest):
 if __name__ == "__main__":
     import uvicorn
     logger.info("Starting Healer Service...", extra={'request_id': 'system'})
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=9001, reload=True)

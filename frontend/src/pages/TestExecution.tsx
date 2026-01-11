@@ -43,9 +43,6 @@ const TestExecution = () => {
     } catch (err: any) {
       setError('Failed to load available tests.');
       console.error('Error fetching tests:', err);
-      // Fallback to mock data
-      const { mockTestFiles } = await import('../services/mockData');
-      setTestFiles(mockTestFiles);
     } finally {
       setLoadingFiles(false);
     }
@@ -70,9 +67,6 @@ const TestExecution = () => {
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to execute tests.');
       console.error('Error executing tests:', err);
-      // Show mock execution on error for UI demonstration
-      const { createMockExecution } = await import('../services/mockData');
-      setExecution(createMockExecution());
     } finally {
       setLoading(false);
     }

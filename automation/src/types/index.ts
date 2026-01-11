@@ -13,7 +13,7 @@ export interface LocatorsFile {
 export interface FailurePayload {
   failed_selector: string;
   html: string;
-  semantic_dom: string;
+  semantic_dom: any;
   use_of_selector: string;
   full_coverage: boolean;
   page_url: string;

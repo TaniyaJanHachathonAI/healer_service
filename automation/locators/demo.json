@@ -1,7 +1,8 @@
 {
   "logoMark": {
-    "selector": "a.logo",
-    "type": "css"
+    "selector": "img.themedComponent_mlkZ",
+    "type": "css",
+    "selectorType": "css"
   },
   "searchButton": {
     "selector": "button[type='submit']",
