@@ -7,18 +7,32 @@ import './Reports.css';
 const Reports = () => {
   const { executionId } = useParams<{ executionId?: string }>();
   const [execution, setExecution] = useState<TestExecution | null>(null);
+  const [reportsList, setReportsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFailure, setSelectedFailure] = useState<string | null>(null);
+
+  const AUTOMATION_API_URL = import.meta.env.VITE_AUTOMATION_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     if (executionId) {
       fetchExecution();
     } else {
-      setError('Execution ID is required');
-      setLoading(false);
+      fetchAllReports();
     }
   }, [executionId]);
+
+  const fetchAllReports = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiService.getAllReports();
+      setReportsList(data);
+    } catch (err: any) {
+      setError('Failed to load reports history');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchExecution = async () => {
     if (!executionId) return;
@@ -101,13 +115,69 @@ const Reports = () => {
     );
   }
 
-  if (error || !execution) {
+  if (error) {
     return (
       <div className="reports">
-        <div className="error">{error || 'Report not found'}</div>
-        <Link to="/test-execution" className="btn btn-secondary">
-          ← Back to Test Execution
-        </Link>
+        <div className="error">{error}</div>
+        <button onClick={() => executionId ? fetchExecution() : fetchAllReports()} className="btn btn-primary">
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!executionId) {
+    return (
+      <div className="reports">
+        <div className="report-header">
+          <h1>Execution History</h1>
+          <p>View all previous test automation reports</p>
+        </div>
+
+        <div className="reports-list-view">
+          {reportsList.length === 0 ? (
+            <div className="empty-state">
+              <p>No execution reports found yet. Start by running some tests!</p>
+              <Link to="/test-execution" className="btn btn-primary">
+                Run Tests
+              </Link>
+            </div>
+          ) : (
+            <div className="history-grid">
+              {reportsList.map((report) => (
+                <Link key={report.id} to={`/reports/${report.id}`} className="history-card">
+                  <div className="history-card-header">
+                    <span className={`status-badge status-${report.status}`}>
+                      {report.status}
+                    </span>
+                    <span className="history-date">{formatDate(report.startTime)}</span>
+                  </div>
+                  <div className="history-stats">
+                    <div className="stat">
+                      <span className="stat-label">Total</span>
+                      <span className="stat-value">{report.totalTests}</span>
+                    </div>
+                    <div className="stat">
+                      <span className="stat-label passed">Passed</span>
+                      <span className="stat-value">{report.passedTests}</span>
+                    </div>
+                    <div className="stat">
+                      <span className="stat-label failed">Failed</span>
+                      <span className="stat-value">{report.failedTests}</span>
+                    </div>
+                    <div className="stat">
+                      <span className="stat-label healed">Healed</span>
+                      <span className="stat-value">{report.healedTests}</span>
+                    </div>
+                  </div>
+                  <div className="history-card-footer">
+                    <span>View Full Report →</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -239,16 +309,23 @@ const Reports = () => {
                   </div>
 
                   <div className="screenshot-section">
-                    <h4>Screenshot</h4>
-                    <div className="screenshot-placeholder">
-                      <div className="placeholder-content">
-                        <span style={{ fontSize: '48px', opacity: 0.3 }}>📸</span>
-                        <p>Screenshot placeholder</p>
-                        <p style={{ fontSize: '12px', color: '#a0aec0', marginTop: '8px' }}>
-                          Screenshot will be available when API is integrated
-                        </p>
+                    <h4>Execution Screenshot</h4>
+                    {result.screenshot ? (
+                      <div className="screenshot-container" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                        <img 
+                          src={`${AUTOMATION_API_URL}${result.screenshot}`} 
+                          alt={`Failure in ${result.testName}`}
+                          style={{ width: '100%', display: 'block' }}
+                        />
                       </div>
-                    </div>
+                    ) : (
+                      <div className="screenshot-placeholder">
+                        <div className="placeholder-content">
+                          <span style={{ fontSize: '48px', opacity: 0.3 }}>📸</span>
+                          <p>No screenshot available</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="failure-actions">

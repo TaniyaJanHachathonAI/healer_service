@@ -109,7 +109,7 @@ export class TestRunner {
           error: errorMessage,
           payload,
         },
-        screenshot: payload.screenshot_path,
+        screenshot: payload.screenshot_path ? `/screenshots/${path.basename(payload.screenshot_path)}` : undefined,
       };
     } finally {
       await page.close();

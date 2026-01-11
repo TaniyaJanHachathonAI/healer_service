@@ -1,0 +1,14 @@
+{
+  "logoMark": {
+    "selector": "a.logo",
+    "type": "css"
+  },
+  "searchButton": {
+    "selector": "button[type='submit']",
+    "type": "css"
+  },
+  "brokenElement": {
+    "selector": ".non-existent-class-for-healing-demo",
+    "type": "css"
+  }
+}

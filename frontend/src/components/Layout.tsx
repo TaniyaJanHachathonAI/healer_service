@@ -30,6 +30,7 @@ const Layout = ({ children }: LayoutProps) => {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/test-execution', label: 'Test Execution', icon: '🎭' },
+    { path: '/reports', label: 'Reports', icon: '📝' },
   ];
 
   const getHealthStatusColor = () => {
