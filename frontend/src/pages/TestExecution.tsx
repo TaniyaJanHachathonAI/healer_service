@@ -199,6 +199,11 @@ const TestExecution = () => {
                     </span>
                   </div>
                 </div>
+                {result.status === 'healed' && result.failure?.selectedLocator && (
+                  <div className="healed-locator-preview" style={{ fontSize: '11px', color: '#2f855a', background: '#f0fff4', padding: '8px', borderRadius: '4px', margin: '8px 0', border: '1px solid #c6f6d5' }}>
+                    <strong>Healed with:</strong> <code style={{ wordBreak: 'break-all' }}>{result.failure.selectedLocator}</code>
+                  </div>
+                )}
                 <div className="result-actions">
                   {result.failure && (
                     <button

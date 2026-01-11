@@ -6,7 +6,7 @@ This document outlines the architecture and API integration for the Selector Hea
 
 The system is fully integrated. The frontend communicates with two backend services:
 1.  **Python Healer Service** (Port 9001): Handles LLM analysis, semantic matching, and database storage for healed selectors.
-2.  **Automation Server** (Port 3001): Handles Playwright test execution, failure capture, and locator management.
+2.  **Automation Server** (Port 3001): Handles Playwright test execution, failure capture, and locator management using `test-data/` folder.
 
 ## Architecture
 
@@ -15,7 +15,7 @@ Frontend (React) <---> Automation Server (Node.js) <---> Healer Service (Python)
                                 |                              |
                                 |                              |
                         Playwright Tests               SQLite Database
-                        (JSON Locators)                (Heal History)
+                        (test-data/ JSON)              (Heal History)
 ```
 
 ## Backend Service URLs
@@ -35,7 +35,7 @@ VITE_AUTOMATION_API_URL=http://127.0.0.1:3001
 
 1. **GET** `/api/tests/available`
    - Returns: `{ testFiles: string[] }`
-   - Scans the `locators/` directory for available test configurations.
+   - Scans the `test-data/` directory for available test configurations.
 
 2. **POST** `/api/tests/execute`
    - Body: `{ testFiles: string[], headless?: boolean }`

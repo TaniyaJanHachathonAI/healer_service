@@ -484,9 +484,25 @@ const Reports = () => {
                     )}
 
                     {result.status === 'healed' && (
-                      <div className="healed-indicator">
-                        <span className="healed-icon">🔧</span>
-                        <span>Test healed and passed</span>
+                      <div className="healed-indicator" style={{ background: '#f0fff4', border: '1px solid #c6f6d5', padding: '16px', borderRadius: '8px', marginTop: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', color: '#2f855a' }}>
+                          <span className="healed-icon" style={{ fontSize: '20px' }}>✨</span>
+                          <span style={{ fontWeight: '700' }}>Self-Healed Successfully</span>
+                        </div>
+                        <div className="healing-details" style={{ fontSize: '13px' }}>
+                          <div style={{ marginBottom: '8px' }}>
+                            <span style={{ color: '#718096', fontWeight: '600', display: 'block', textTransform: 'uppercase', fontSize: '11px' }}>Original Broken Selector</span>
+                            <code style={{ background: '#fff5f5', color: '#c53030', padding: '4px 8px', borderRadius: '4px', display: 'block', marginTop: '4px', wordBreak: 'break-all' }}>
+                              {result.failure?.payload.failed_selector}
+                            </code>
+                          </div>
+                          <div>
+                            <span style={{ color: '#718096', fontWeight: '600', display: 'block', textTransform: 'uppercase', fontSize: '11px' }}>Newly Applied Selector</span>
+                            <code style={{ background: '#f0fff4', color: '#22543d', padding: '4px 8px', borderRadius: '4px', display: 'block', marginTop: '4px', wordBreak: 'break-all' }}>
+                              {result.failure?.selectedLocator}
+                            </code>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
