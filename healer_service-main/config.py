@@ -13,9 +13,15 @@ class Config:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
     
+    # Gemini API Configuration (for vision analysis)
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    # GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-latest:generateContent"
+    # GEMINI_VISION_MODEL = os.getenv("GEMINI_VISION_MODEL", "gemini-1.5-flash-latest")
+    GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models"
+    GEMINI_VISION_MODEL = "gemini-1.5-flash-001"
     # LLM Models
     LLM_MODEL = os.getenv("LLM_MODEL", "meta-llama/llama-3-8b-instruct")
-    VISION_MODEL = os.getenv("VISION_MODEL", "google/gemini-pro-vision")
+    VISION_MODEL = os.getenv("VISION_MODEL", "gemini-1.5-flash-001")  # Now uses Gemini directly
     
     # LLM Parameters
     LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "800"))

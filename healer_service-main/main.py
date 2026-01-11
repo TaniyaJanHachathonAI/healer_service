@@ -24,9 +24,8 @@ from xpath_generator import (
     generate_xpath_from_dom, is_xpath, rank_xpaths,
     xpath_stability_score, xpath_semantic_score
 )
-from vision_analyzer import get_visual_context_for_healing
+from vision_analyzer import get_visual_context_for_healing, analyze_screenshot_with_vision
 from dom_extractor import DOMExtractor
-from main import DOMExtractor
 from matching_engine  import MatchingEngine
 import numpy as np
 import pandas as pd
@@ -652,7 +651,9 @@ async def health_check():
 def build_custom_heal_response(
     engine_results: list,
     request_id: str,
-    processing_time: float
+    processing_time: float,
+    vision_analyzed: bool = False,
+    vision_analysis: Optional[Dict[str, Any]] = None
 ):
     candidates = []
 
@@ -669,16 +670,23 @@ def build_custom_heal_response(
             "xpath": el.get("xpath"),
         })
 
+    debug_info = {
+        "total_candidates": len(candidates),
+        "engine": "matching_engine_faiss",
+        "processing_time_ms": round(processing_time, 2),
+        "vision_analyzed": vision_analyzed
+    }
+    
+    if vision_analyzed and vision_analysis:
+        debug_info["vision_model"] = vision_analysis.get("model_used")
+        debug_info["vision_success"] = vision_analysis.get("success", False)
+
     return {
         "request_id": request_id,
         "message": "Success",
         "chosen": candidates[0]["selector"] if candidates else None,
         "candidates": candidates,
-        "debug": {
-            "total_candidates": len(candidates),
-            "engine": "matching_engine_faiss",
-            "processing_time_ms": round(processing_time, 2)
-        }
+        "debug": debug_info
     }
 
 
@@ -711,6 +719,34 @@ async def heal(req: HealRequest):
             html_content = req.html  # Always preserve HTML for validation
             dom_data = None
             local_cands = []
+            
+            # Vision Layer: Get visual analysis if screenshot is provided
+            vision_analysis = None
+            vision_analyzed = False
+            enhanced_semantic_context = req.use_of_selector or ""
+            
+            if req.screenshot_path and Config.ENABLE_SCREENSHOT_ANALYSIS:
+                req_logger.log_info(f"Analyzing screenshot: {req.screenshot_path}")
+                vision_analysis = analyze_screenshot_with_vision(
+                    screenshot_path=req.screenshot_path,
+                    failed_selector=req.failed_selector,
+                    page_url=req.page_url
+                )
+                
+                if vision_analysis and vision_analysis.get("success"):
+                    vision_analyzed = True
+                    visual_context = vision_analysis.get("analysis", "")
+                    
+                    # Enhance semantic context with visual analysis
+                    if enhanced_semantic_context:
+                        enhanced_semantic_context = f"{enhanced_semantic_context}. Visual context: {visual_context}"
+                    else:
+                        enhanced_semantic_context = f"Visual context: {visual_context}"
+                    
+                    req_logger.log_info("Vision analysis completed successfully")
+                else:
+                    req_logger.log_warning("Vision analysis failed or returned no results")
+            
             if req.semantic_dom:
                 # Use provided semantic DOM (76% smaller!)
                 # Generate candidates from semantic DOM elements
@@ -718,18 +754,21 @@ async def heal(req: HealRequest):
                 dom_data = extractor.extract_semantic_dom(full_coverage=True)
 
                 engine = MatchingEngine(dom_data['elements'])
-                dom_data  = engine.rank(req.failed_selector, req.use_of_selector, top_k=2)
+                
+                # Use enhanced semantic context (includes visual analysis if available)
                 processing_time = (time.time() - start_time) * 1000
                 results = engine.rank(
                     req.failed_selector,
-                    req.use_of_selector,
+                    enhanced_semantic_context,  # Enhanced with vision context
                     top_k=5
                 )
 
                 response = build_custom_heal_response(
                     engine_results=results,
                     request_id=req_logger.request_id,
-                    processing_time=processing_time
+                    processing_time=processing_time,
+                    vision_analyzed=vision_analyzed,
+                    vision_analysis=vision_analysis
                 )
 
                 return response
