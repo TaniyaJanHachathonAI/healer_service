@@ -5,6 +5,7 @@ import { TestRunner, TestCase } from './testRunner';
 import { LocatorManager } from './utils/locatorManager';
 import { FailureCapture } from './utils/failureCapture';
 import { HealerClient } from './utils/healerClient';
+import { SpecRunner } from './utils/specRunner';
 import type { TestExecution, FailurePayload, HealingResponse } from './types';
 
 const app = express();
@@ -19,6 +20,7 @@ const testRunner = new TestRunner(process.env.HEALER_API_URL);
 const locatorManager = new LocatorManager();
 const failureCapture = new FailureCapture();
 const healerClient = new HealerClient(process.env.HEALER_API_URL);
+const specRunner = new SpecRunner(path.join(__dirname, '..'));
 
 // Store active executions and their test case logic
 const activeExecutions = new Map<string, TestExecution>();
@@ -32,23 +34,37 @@ app.get('/health', (req, res) => {
 });
 
 /**
- * Get available test files/locator files
+ * Get available test files - both locator files and spec files
  */
 app.get('/api/tests/available', (req, res) => {
   try {
-    const locatorsDir = path.join(__dirname, '../locators');
-    const fs = require('fs').promises;
     const fsSync = require('fs');
-    
-    if (!fsSync.existsSync(locatorsDir)) {
-      return res.json({ testFiles: [] });
+    const testFiles: string[] = [];
+
+    // Get spec files from tests directory
+    const testsDir = path.join(__dirname, '../tests');
+    if (fsSync.existsSync(testsDir)) {
+      const specFiles = fsSync.readdirSync(testsDir)
+        .filter((file: string) => file.endsWith('.spec.ts'))
+        .map((file: string) => file.replace('.spec.ts', ''));
+      testFiles.push(...specFiles);
     }
 
-    const files = fsSync.readdirSync(locatorsDir)
-      .filter((file: string) => file.endsWith('.json'))
-      .map((file: string) => file.replace('.json', ''));
+    // Also get locator files (for backward compatibility)
+    const locatorsDir = path.join(__dirname, '../locators');
+    if (fsSync.existsSync(locatorsDir)) {
+      const locatorFiles = fsSync.readdirSync(locatorsDir)
+        .filter((file: string) => file.endsWith('.json'))
+        .map((file: string) => file.replace('.json', ''));
+      // Only add locator files that don't already exist as spec files
+      locatorFiles.forEach((file: string) => {
+        if (!testFiles.includes(file)) {
+          testFiles.push(file);
+        }
+      });
+    }
 
-    res.json({ testFiles: files });
+    res.json({ testFiles });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -66,27 +82,40 @@ app.post('/api/tests/execute', async (req, res) => {
     }
 
     // Set headless mode if provided
-    if (headless !== undefined) {
-      process.env.HEADLESS = headless ? 'true' : 'false';
+    const headlessMode = headless !== undefined ? headless : true;
+
+    // Check if test files are spec files (they should have corresponding .spec.ts files)
+    const fsSync = require('fs');
+    const testsDir = path.join(__dirname, '../tests');
+    const isSpecFile = (file: string) => {
+      const fileName = file.endsWith('.spec.ts') ? file : `${file}.spec.ts`;
+      return fsSync.existsSync(path.join(testsDir, fileName));
+    };
+
+    const specFiles = testFiles.filter(isSpecFile);
+    
+    if (specFiles.length > 0) {
+      // Run spec files using SpecRunner
+      const execution = await specRunner.runSpecFiles(specFiles, headlessMode);
+      activeExecutions.set(execution.id, execution);
+      res.json(execution);
+    } else {
+      // Fall back to legacy locator-based test execution (for backward compatibility)
+      const testCasesToRun: TestCase[] = testFiles.map((testFile: string) => ({
+        name: testFile,
+        locatorFile: testFile,
+        testFunction: async (page: any, locators: any) => {
+          // Mock test function - replace with actual test logic
+          throw new Error('Mock test - implement actual test cases');
+        },
+      }));
+
+      const execution = await testRunner.runTests(testCasesToRun);
+      activeExecutions.set(execution.id, execution);
+      executionTestCases.set(execution.id, testCasesToRun);
+
+      res.json(execution);
     }
-
-    // This is a simplified version - in real implementation,
-    // you would load actual test cases from test files
-    const testCasesToRun: TestCase[] = testFiles.map((testFile: string) => ({
-      name: testFile,
-      locatorFile: testFile,
-      testFunction: async (page: any, locators: any) => {
-        // Mock test function - replace with actual test logic
-        // This should be loaded from actual test files
-        throw new Error('Mock test - implement actual test cases');
-      },
-    }));
-
-    const execution = await testRunner.runTests(testCasesToRun);
-    activeExecutions.set(execution.id, execution);
-    executionTestCases.set(execution.id, testCasesToRun);
-
-    res.json(execution);
   } catch (error: any) {
     console.error('Error executing tests:', error);
     res.status(500).json({ error: error.message });
