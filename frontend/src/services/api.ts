@@ -11,11 +11,12 @@ import type {
   TestExecution,
   ExecuteTestsRequest,
   FailurePayload,
-  HealingResponse
+  HealingResponse,
+  TestResult
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
-const AUTOMATION_API_URL = import.meta.env.VITE_AUTOMATION_API_URL || 'http://localhost:3001';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:9001';
+const AUTOMATION_API_URL = (import.meta as any).env?.VITE_AUTOMATION_API_URL || 'http://127.0.0.1:3001';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -48,8 +49,7 @@ export const apiService = {
   getHistory: async (params?: {
     page?: number;
     page_size?: number;
-    start_date?: string;
-    end_date?: string;
+    url_filter?: string;
   }): Promise<HistoryResponse> => {
     const response = await api.get<HistoryResponse>('/history', { params });
     return response.data;
@@ -73,83 +73,41 @@ export const apiService = {
   },
 
   // Automation Framework APIs
-  // NOTE: These will be integrated when backend API is ready
-  // For now, using mock data - see mockData.ts
   
   // Get available test files
   getAvailableTests: async (): Promise<{ testFiles: string[] }> => {
-    try {
-      const response = await automationApi.get<{ testFiles: string[] }>('/api/tests/available');
-      return response.data;
-    } catch (error) {
-      // Fallback to mock data if API is not yet ready
-      const { mockTestFiles, mockDelay } = await import('./mockData');
-      await mockDelay(500);
-      return { testFiles: mockTestFiles };
-    }
+    const response = await automationApi.get<{ testFiles: string[] }>('/api/tests/available');
+    return response.data;
   },
 
   // Execute tests
   executeTests: async (request: ExecuteTestsRequest): Promise<TestExecution> => {
-    try {
-      const response = await automationApi.post<TestExecution>('/api/tests/execute', request);
-      return response.data;
-    } catch (error) {
-      // Fallback to mock data if API is not yet ready
-      const { createMockExecution, mockDelay } = await import('./mockData');
-      await mockDelay(2000);
-      return createMockExecution();
-    }
+    const response = await automationApi.post<TestExecution>('/api/tests/execute', request);
+    return response.data;
   },
 
   // Get execution status
   getExecution: async (executionId: string): Promise<TestExecution> => {
-    try {
-      const response = await automationApi.get<TestExecution>(`/api/tests/execution/${executionId}`);
-      return response.data;
-    } catch (error) {
-      // Fallback to mock data
-      const { createMockExecution, mockDelay } = await import('./mockData');
-      await mockDelay(500);
-      return createMockExecution();
-    }
+    const response = await automationApi.get<TestExecution>(`/api/tests/execution/${executionId}`);
+    return response.data;
+  },
+
+  // Get all execution reports
+  getAllReports: async (): Promise<any[]> => {
+    const response = await automationApi.get<any[]>('/api/reports');
+    return response.data;
   },
 
   // Get failure details
   getFailure: async (testId: string): Promise<{ testResult: TestResult; payload: FailurePayload; executionId?: string }> => {
-    try {
-      const response = await automationApi.get(`/api/failures/${testId}`);
-      return response.data;
-    } catch (error) {
-      // Fallback to mock data
-      const { createMockExecution, mockDelay } = await import('./mockData');
-      await mockDelay(500);
-      const execution = createMockExecution();
-      const result = execution.results.find(r => r.id === testId);
-      
-      if (!result || !result.failure) {
-        throw new Error('Failure not found');
-      }
-      
-      return {
-        testResult: result,
-        payload: result.failure.payload,
-        executionId: execution.id,
-      };
-    }
+    const response = await automationApi.get(`/api/failures/${testId}`);
+    return response.data;
   },
 
   // Heal selector via automation API (which calls healer service)
-  healFailure: async (payload: FailurePayload): Promise<HealingResponse> => {
-    try {
-      const response = await automationApi.post<HealingResponse>('/api/heal', { payload });
-      return response.data;
-    } catch (error) {
-      // Fallback to mock data
-      const { createMockHealingResponse, mockDelay } = await import('./mockData');
-      await mockDelay(2000);
-      return createMockHealingResponse();
-    }
+  healFailure: async (payload: FailurePayload, options: any = {}): Promise<HealingResponse> => {
+    const response = await automationApi.post<HealingResponse>('/api/heal', { payload, options });
+    return response.data;
   },
 
   // Heal and re-run test
@@ -159,19 +117,8 @@ export const apiService = {
     selectedSelector: string;
     selectorType: 'css' | 'xpath';
   }): Promise<any> => {
-    try {
-      const response = await automationApi.post('/api/tests/heal-and-rerun', request);
-      return response.data;
-    } catch (error) {
-      // Fallback to mock data
-      const { mockDelay } = await import('./mockData');
-      await mockDelay(1500);
-      return {
-        message: 'Locator updated successfully (Mock - API integration pending)',
-        testId: request.testId,
-        selectedSelector: request.selectedSelector,
-      };
-    }
+    const response = await automationApi.post('/api/tests/heal-and-rerun', request);
+    return response.data;
   },
 };
 

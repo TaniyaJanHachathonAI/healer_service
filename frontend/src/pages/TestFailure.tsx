@@ -16,6 +16,11 @@ const TestFailure = () => {
   const [error, setError] = useState<string | null>(null);
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [executionId, setExecutionId] = useState<string | null>(null);
+  const [healerOptions, setHealerOptions] = useState({
+    full_coverage: true,
+    selector_type: 'mixed' as 'css' | 'xpath' | 'mixed',
+    vision_enabled: true
+  });
 
   useEffect(() => {
     if (testId) {
@@ -33,7 +38,13 @@ const TestFailure = () => {
       const data = await apiService.getFailure(testId);
       setPayload(data.payload);
       setExecutionId((data as any).executionId || null);
-      setScreenshotUrl(null); // Screenshot placeholder
+      
+      // Construct screenshot URL
+      if (data.payload.screenshot_path) {
+        const AUTOMATION_API_URL = (import.meta as any).env?.VITE_AUTOMATION_API_URL || 'http://127.0.0.1:3001';
+        const filename = data.payload.screenshot_path.split(/[\\/]/).pop();
+        setScreenshotUrl(`${AUTOMATION_API_URL}/screenshots/${filename}`);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to load failure details');
       console.error('Error fetching failure:', err);
@@ -49,7 +60,7 @@ const TestFailure = () => {
     setError(null);
 
     try {
-      const response = await apiService.healFailure(payload);
+      const response = await apiService.healFailure(payload, healerOptions);
       setHealingResponse(response);
       
       // Auto-select if available
@@ -88,15 +99,17 @@ const TestFailure = () => {
     }
 
     try {
-      await apiService.healAndRerun({
+      const response = await apiService.healAndRerun({
         executionId,
         testId: testId!,
         selectedSelector,
         selectorType,
       });
 
-      alert('Locator updated successfully! Test will be re-executed.');
-      navigate(`/test-execution/${executionId}`);
+      alert('Locator updated successfully! Test was re-executed.');
+      // Navigate to the NEW execution ID returned by the server
+      const newId = response.execution?.id || executionId;
+      navigate(`/test-execution/${newId}`);
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to heal and re-run test');
       console.error('Error healing and re-running:', err);
@@ -153,7 +166,7 @@ const TestFailure = () => {
             <span className="info-value selector-value">{payload.failed_selector}</span>
           </div>
           <div className="info-item">
-            <span className="info-label">Use Case</span>
+            <span className="info-label">Use Case (Context)</span>
             <span className="info-value">{payload.use_of_selector}</span>
           </div>
           <div className="info-item">
@@ -165,8 +178,12 @@ const TestFailure = () => {
             </span>
           </div>
           <div className="info-item">
-            <span className="info-label">Selector Type</span>
-            <span className="info-value">{payload.selector_type}</span>
+            <span className="info-label">Semantic Analysis</span>
+            <span className="info-value">
+              {payload.semantic_dom && typeof payload.semantic_dom.total_elements === 'number'
+                ? payload.semantic_dom.total_elements
+                : 0} interactive elements captured
+            </span>
           </div>
           <div className="info-item">
             <span className="info-label">Timestamp</span>
@@ -187,7 +204,44 @@ const TestFailure = () => {
       {!healingResponse && (
         <div className="heal-action-card">
           <h2>Heal Selector</h2>
-          <p>Click the button below to get healed selector suggestions from the AI healer service.</p>
+          <p style={{ marginBottom: '20px' }}>Configure healing options and request AI suggestions from the Python service.</p>
+          
+          <div className="healer-settings" style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '14px', marginBottom: '16px', color: '#4a5568', textTransform: 'uppercase' }}>🔧 Healer Settings (Python API Arguments)</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#718096', marginBottom: '8px' }}>Selector Type</label>
+                <select 
+                  value={healerOptions.selector_type}
+                  onChange={(e) => setHealerOptions({...healerOptions, selector_type: e.target.value as any})}
+                  style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e0' }}
+                >
+                  <option value="mixed">Mixed (CSS & XPath)</option>
+                  <option value="css">CSS Only</option>
+                  <option value="xpath">XPath Only</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
+                <input 
+                  type="checkbox" 
+                  id="full_coverage"
+                  checked={healerOptions.full_coverage}
+                  onChange={(e) => setHealerOptions({...healerOptions, full_coverage: e.target.checked})}
+                />
+                <label htmlFor="full_coverage" style={{ fontSize: '14px', fontWeight: '500' }}>Full Coverage Mode</label>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
+                <input 
+                  type="checkbox" 
+                  id="vision_enabled"
+                  checked={healerOptions.vision_enabled}
+                  onChange={(e) => setHealerOptions({...healerOptions, vision_enabled: e.target.checked})}
+                />
+                <label htmlFor="vision_enabled" style={{ fontSize: '14px', fontWeight: '500' }}>Vision AI Analysis</label>
+              </div>
+            </div>
+          </div>
+
           <button
             className="btn btn-primary btn-large"
             onClick={handleHeal}
@@ -220,34 +274,60 @@ const TestFailure = () => {
             </div>
 
             <div className="selectors-list">
-              {(selectorType === 'css' ? healingResponse.css_selectors : healingResponse.xpath_selectors).map(
-                (selector: HealedSelector, index: number) => {
-                  const selectorValue = selectorType === 'css' 
-                    ? selector['Suggested Selector'] 
-                    : selector.XPath;
-                  const isSelected = selectedSelector === selectorValue;
+              {(selectorType === 'css' ? healingResponse.css_selectors : healingResponse.xpath_selectors).length === 0 ? (
+                <div className="empty-state" style={{ padding: '40px', textAlign: 'center', background: '#f7fafc', borderRadius: '8px', border: '2px dashed #cbd5e0' }}>
+                  <p>No {selectorType.toUpperCase()} suggestions found for this element.</p>
+                  <p style={{ fontSize: '13px', color: '#718096', marginTop: '8px' }}>Try switching tabs or adjusting healing options.</p>
+                </div>
+              ) : (
+                (selectorType === 'css' ? healingResponse.css_selectors : healingResponse.xpath_selectors).map(
+                  (selector: HealedSelector, index: number) => {
+                    const selectorValue = selectorType === 'css' 
+                      ? selector['Suggested Selector'] 
+                      : selector.XPath;
+                    const isSelected = selectedSelector === selectorValue;
+                    const isRecommended = (selectorType === 'css' && healingResponse.auto_selected?.css === selectorValue) ||
+                                         (selectorType === 'xpath' && healingResponse.auto_selected?.xpath === selectorValue);
 
-                  return (
-                    <div
-                      key={index}
-                      className={`selector-item ${isSelected ? 'selected' : ''}`}
-                      onClick={() => handleSelectSelector(selectorValue, selectorType)}
-                    >
-                      <div className="selector-item-header">
-                        <span className="selector-rank">#{selector.RankIndex}</span>
-                        <span className="selector-score">Score: {(selector.Score * 100).toFixed(1)}%</span>
+                    return (
+                      <div
+                        key={index}
+                        className={`selector-item ${isSelected ? 'selected' : ''}`}
+                        onClick={() => handleSelectSelector(selectorValue, selectorType)}
+                        style={{ position: 'relative' }}
+                      >
+                        {isRecommended && (
+                          <span className="recommended-badge" style={{ 
+                            position: 'absolute', 
+                            top: '12px', 
+                            right: '12px', 
+                            background: '#ebf8ff', 
+                            color: '#2b6cb0', 
+                            fontSize: '10px', 
+                            fontWeight: '700', 
+                            padding: '2px 8px', 
+                            borderRadius: '4px',
+                            border: '1px solid #bee3f8'
+                          }}>
+                            ⭐ RECOMMENDED
+                          </span>
+                        )}
+                        <div className="selector-item-header">
+                          <span className="selector-rank">#{selector.RankIndex}</span>
+                          <span className="selector-score">Score: {(selector.Score * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="selector-value-display">
+                          {selectorType === 'css' ? selector['Suggested Selector'] : selector.XPath}
+                        </div>
+                        <div className="selector-metadata">
+                          <span>Tag: {selector.Tag}</span>
+                          {selector.Text && <span>Text: {selector.Text.substring(0, 50)}</span>}
+                          {selector.Role && <span>Role: {selector.Role}</span>}
+                        </div>
                       </div>
-                      <div className="selector-value-display">
-                        {selectorType === 'css' ? selector['Suggested Selector'] : selector.XPath}
-                      </div>
-                      <div className="selector-metadata">
-                        <span>Tag: {selector.Tag}</span>
-                        {selector.Text && <span>Text: {selector.Text.substring(0, 50)}</span>}
-                        <span>Role: {selector.Role}</span>
-                      </div>
-                    </div>
-                  );
-                }
+                    );
+                  }
+                )
               )}
             </div>
 

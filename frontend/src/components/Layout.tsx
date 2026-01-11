@@ -13,14 +13,21 @@ const Layout = ({ children }: LayoutProps) => {
   const [health, setHealth] = useState<HealthResponse | null>(null);
 
   useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const healthData = await apiService.getHealth();
-        setHealth(healthData);
-      } catch (error) {
-        console.error('Health check failed:', error);
-      }
-    };
+  const checkHealth = async () => {
+    try {
+      const healthData = await apiService.getHealth();
+      setHealth(healthData);
+    } catch (error) {
+      console.error('Health check failed:', error);
+      // Set a fake "unhealthy" status if the request fails completely
+      setHealth({
+        status: 'unhealthy',
+        database_connected: false,
+        llm_api_available: false,
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
 
     checkHealth();
     const interval = setInterval(checkHealth, 30000); // Check every 30 seconds
@@ -30,16 +37,15 @@ const Layout = ({ children }: LayoutProps) => {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/test-execution', label: 'Test Execution', icon: '🎭' },
+    { path: '/reports', label: 'Reports', icon: '📝' },
   ];
 
   const getHealthStatusColor = () => {
     if (!health) return '#888';
-    switch (health.status) {
-      case 'healthy': return '#4caf50';
-      case 'degraded': return '#ff9800';
-      case 'unhealthy': return '#f44336';
-      default: return '#888';
-    }
+    if (health.status === 'healthy') return '#4caf50';
+    if (health.status === 'degraded') return '#ff9800';
+    if (health.status === 'unhealthy' || !health.database_connected) return '#f44336';
+    return '#888';
   };
 
   return (
@@ -71,14 +77,14 @@ const Layout = ({ children }: LayoutProps) => {
           <div className="system-info">
             <div className="info-item">
               <span>DB:</span>
-              <span className={health?.database === 'connected' ? 'status-good' : 'status-bad'}>
-                {health?.database || 'Unknown'}
+              <span className={health?.database_connected ? 'status-good' : 'status-bad'}>
+                {health ? (health.database_connected ? 'Connected' : 'Disconnected') : 'Unknown'}
               </span>
             </div>
             <div className="info-item">
               <span>LLM:</span>
-              <span className={health?.llm_available ? 'status-good' : 'status-bad'}>
-                {health?.llm_available ? 'Available' : 'Unavailable'}
+              <span className={health?.llm_api_available ? 'status-good' : 'status-bad'}>
+                {health ? (health.llm_api_available ? 'Available' : 'Unavailable') : 'Unknown'}
               </span>
             </div>
           </div>

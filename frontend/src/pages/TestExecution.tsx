@@ -43,9 +43,6 @@ const TestExecution = () => {
     } catch (err: any) {
       setError('Failed to load available tests.');
       console.error('Error fetching tests:', err);
-      // Fallback to mock data
-      const { mockTestFiles } = await import('../services/mockData');
-      setTestFiles(mockTestFiles);
     } finally {
       setLoadingFiles(false);
     }
@@ -70,9 +67,6 @@ const TestExecution = () => {
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to execute tests.');
       console.error('Error executing tests:', err);
-      // Show mock execution on error for UI demonstration
-      const { createMockExecution } = await import('../services/mockData');
-      setExecution(createMockExecution());
     } finally {
       setLoading(false);
     }
@@ -205,6 +199,11 @@ const TestExecution = () => {
                     </span>
                   </div>
                 </div>
+                {result.status === 'healed' && result.failure?.selectedLocator && (
+                  <div className="healed-locator-preview" style={{ fontSize: '11px', color: '#2f855a', background: '#f0fff4', padding: '8px', borderRadius: '4px', margin: '8px 0', border: '1px solid #c6f6d5' }}>
+                    <strong>Healed with:</strong> <code style={{ wordBreak: 'break-all' }}>{result.failure.selectedLocator}</code>
+                  </div>
+                )}
                 <div className="result-actions">
                   {result.failure && (
                     <button
