@@ -56,7 +56,7 @@
     "selectorType": "css"
   },
   "appLuncher": {
-    "selector": "button.slds-button",
+    "selector": "button[title=\"App Laucher\"]",
     "selectorType": "css"
   },
   "search": {

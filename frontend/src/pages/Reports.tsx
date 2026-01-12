@@ -176,71 +176,93 @@ const Reports = () => {
     let currentY = (doc as any).lastAutoTable.finalY + 20;
 
     for (const result of execution.results) {
-      if (result.status === 'passed') continue;
+      // New page for each detailed result to keep it clean
+      doc.addPage();
+      currentY = 20;
 
-      // New page if needed
-      if (currentY > 220) {
-        doc.addPage();
-        currentY = 20;
-      }
-
-      doc.setFontSize(14);
-      doc.setTextColor(result.status === 'failed' ? [229, 62, 62] : [49, 130, 206]);
-      doc.text(`${result.status === 'failed' ? 'Failure' : 'Healing'} Details: ${result.testName}`, 14, currentY);
-      currentY += 10;
-
+      doc.setFontSize(16);
+      const statusColor = result.status === 'passed' ? [56, 161, 105] : (result.status === 'failed' ? [229, 62, 62] : [49, 130, 206]);
+      doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+      doc.text(`Test Analysis: ${result.testName}`, 14, currentY);
+      
       doc.setFontSize(10);
+      doc.setTextColor(120, 120, 120);
+      doc.text(`Status: ${result.status.toUpperCase()}`, 14, currentY + 7);
+      currentY += 15;
+
       doc.setTextColor(0, 0, 0);
       
-      const details = [];
+      const details = [
+        ['Test ID', result.id],
+        ['Status', result.status.toUpperCase()],
+        ['Start Time', formatDate(result.startTime)],
+        ['End Time', result.endTime ? formatDate(result.endTime) : 'N/A'],
+        ['Duration', result.duration ? `${(result.duration / 1000).toFixed(2)}s` : 'N/A'],
+      ];
+
       if (result.failure) {
-        details.push(['Error', result.failure.error]);
+        if (result.failure.payload.locator_key) {
+          details.push(['Locator Key', result.failure.payload.locator_key]);
+        }
         details.push(['Failed Selector', result.failure.payload.failed_selector]);
-        details.push(['Use Case', result.failure.payload.use_of_selector || 'N/A']);
-        details.push(['Page URL', result.failure.payload.page_url]);
         details.push(['Selector Type', result.failure.payload.selector_type]);
-        details.push(['Interactive Elements', (result.failure.payload.semantic_dom?.total_elements || 0).toString()]);
+        details.push(['Page URL', result.failure.payload.page_url]);
+        details.push(['Use Case Context', result.failure.payload.use_of_selector || 'N/A']);
+        details.push(['Capture Timestamp', result.failure.payload.timestamp ? formatDate(result.failure.payload.timestamp) : 'N/A']);
+        details.push(['DOM Elements Count', (result.failure.payload.semantic_dom?.total_elements || 0).toString()]);
         
         if (result.status === 'healed') {
           details.push(['Healed Selector', result.failure.selectedLocator || 'N/A']);
         }
+        
+        // Error message can be long, so we'll handle it separately or at the end
+        details.push(['Error Message', result.failure.error]);
       }
 
       autoTable(doc, {
         startY: currentY,
         body: details,
-        theme: 'plain',
+        theme: 'striped',
+        styles: { fontSize: 9 },
         columnStyles: {
-          0: { fontStyle: 'bold', cellWidth: 40 },
-          1: { cellWidth: 140 }
+          0: { fontStyle: 'bold', cellWidth: 45 },
+          1: { cellWidth: 135, overflow: 'linebreak' }
         },
       });
 
-      currentY = (doc as any).lastAutoTable.finalY + 10;
+      currentY = (doc as any).lastAutoTable.finalY + 15;
 
       // Add Screenshot
       if (result.screenshot) {
         const imgUrl = `${AUTOMATION_API_URL}${result.screenshot}`;
         const base64Img = await getBase64Image(imgUrl);
         if (base64Img) {
-          // Calculate aspect ratio to fit image
-          const imgProps = doc.getImageProperties(base64Img);
-          const imgWidth = 140;
-          const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+          try {
+            // Calculate aspect ratio to fit image
+            const imgProps = doc.getImageProperties(base64Img);
+            const imgWidth = 170; // Wider screenshot
+            const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
-          if (currentY + imgHeight > 270) {
-            doc.addPage();
-            currentY = 20;
+            if (currentY + imgHeight > 270) {
+              doc.addPage();
+              currentY = 20;
+            }
+
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Execution Screenshot:', 14, currentY - 5);
+            doc.addImage(base64Img, 'PNG', 14, currentY, imgWidth, imgHeight);
+            currentY += imgHeight + 20;
+          } catch (e) {
+            console.error('Error adding image to PDF:', e);
           }
-
-          doc.addImage(base64Img, 'PNG', 14, currentY, imgWidth, imgHeight);
-          currentY += imgHeight + 15;
         }
-      } else {
-      doc.setFont('helvetica', 'italic');
-      doc.text('No screenshot available', 14, currentY);
-      currentY += 15;
-      doc.setFont('helvetica', 'normal');
+      } else if (result.status !== 'passed') {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(10);
+        doc.text('No screenshot available for this failure.', 14, currentY);
+        currentY += 15;
+        doc.setFont('helvetica', 'normal');
       }
     }
 
