@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import apiService from '../services/api';
 import type { TestExecution } from '../types';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import './Reports.css';
 
 const Reports = () => {
@@ -85,51 +87,173 @@ const Reports = () => {
     return `${(duration / 1000).toFixed(2)}s`;
   };
 
-  const downloadReport = () => {
+  const downloadReport = async () => {
     if (!execution) return;
 
-    const reportData = {
-      execution: {
-        id: execution.id,
-        status: execution.status,
-        startTime: execution.startTime,
-        endTime: execution.endTime,
-        totalTests: execution.totalTests,
-        passedTests: execution.passedTests,
-        failedTests: execution.failedTests,
-        healedTests: execution.healedTests,
-      },
-      results: execution.results.map(result => ({
-        id: result.id,
-        testName: result.testName,
-        status: result.status,
-        startTime: result.startTime,
-        endTime: result.endTime,
-        duration: result.duration,
-        failure: result.failure ? {
-          error: result.failure.error,
-          payload: {
-            failed_selector: result.failure.payload.failed_selector,
-            use_of_selector: result.failure.payload.use_of_selector,
-            page_url: result.failure.payload.page_url,
-            selector_type: result.failure.payload.selector_type,
-            timestamp: result.failure.payload.timestamp,
-            semantic_dom_elements: result.failure.payload.semantic_dom?.total_elements || 0,
-          },
-        } : null,
-      })),
-      generatedAt: new Date().toISOString(),
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Helper to fetch image and convert to base64
+    const getBase64Image = async (url: string): Promise<string | null> => {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.error('Error fetching image for PDF:', e);
+        return null;
+      }
     };
 
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `test-report-${execution.id}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Title
+    doc.setFontSize(22);
+    doc.setTextColor(49, 130, 206); // #3182ce
+    doc.text('Test Execution Report', 14, 22);
+    
+    // Summary Section
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Execution Summary', 14, 35);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    const summaryData = [
+      ['Execution ID', execution.id],
+      ['Status', execution.status.toUpperCase()],
+      ['Start Time', formatDate(execution.startTime)],
+      ['End Time', execution.endTime ? formatDate(execution.endTime) : 'Running...'],
+      ['Duration', formatDuration(execution.startTime, execution.endTime)],
+      ['Total Tests', execution.totalTests.toString()],
+      ['Passed', execution.passedTests.toString()],
+      ['Failed', execution.failedTests.toString()],
+      ['Healed', execution.healedTests.toString()],
+    ];
+
+    autoTable(doc, {
+      startY: 40,
+      head: [['Metric', 'Value']],
+      body: summaryData,
+      theme: 'striped',
+      headStyles: { fillColor: [49, 130, 206] },
+    });
+
+    // Test Results Table
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Test Results Analysis', 14, (doc as any).lastAutoTable.finalY + 15);
+
+    const resultsData = execution.results.map((r, i) => [
+      i + 1,
+      r.testName,
+      r.status.toUpperCase(),
+      r.duration ? `${(r.duration / 1000).toFixed(2)}s` : 'N/A'
+    ]);
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [['#', 'Test Name', 'Status', 'Duration']],
+      body: resultsData,
+      theme: 'grid',
+      headStyles: { fillColor: [74, 85, 104] }, // #4a5568
+      columnStyles: {
+        2: { fontStyle: 'bold' }
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 2) {
+          const status = data.cell.raw as string;
+          if (status === 'PASSED') data.cell.styles.textColor = [56, 161, 105]; // #38a169
+          if (status === 'FAILED') data.cell.styles.textColor = [229, 62, 62]; // #e53e3e
+          if (status === 'HEALED') data.cell.styles.textColor = [49, 130, 206]; // #3182ce
+        }
+      }
+    });
+
+    // Detailed Failure/Healing Analysis
+    let currentY = (doc as any).lastAutoTable.finalY + 20;
+
+    for (const result of execution.results) {
+      if (result.status === 'passed') continue;
+
+      // New page if needed
+      if (currentY > 220) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(result.status === 'failed' ? [229, 62, 62] : [49, 130, 206]);
+      doc.text(`${result.status === 'failed' ? 'Failure' : 'Healing'} Details: ${result.testName}`, 14, currentY);
+      currentY += 10;
+
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      
+      const details = [];
+      if (result.failure) {
+        details.push(['Error', result.failure.error]);
+        details.push(['Failed Selector', result.failure.payload.failed_selector]);
+        details.push(['Use Case', result.failure.payload.use_of_selector || 'N/A']);
+        details.push(['Page URL', result.failure.payload.page_url]);
+        details.push(['Selector Type', result.failure.payload.selector_type]);
+        details.push(['Interactive Elements', (result.failure.payload.semantic_dom?.total_elements || 0).toString()]);
+        
+        if (result.status === 'healed') {
+          details.push(['Healed Selector', result.failure.selectedLocator || 'N/A']);
+        }
+      }
+
+      autoTable(doc, {
+        startY: currentY,
+        body: details,
+        theme: 'plain',
+        columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 40 },
+          1: { cellWidth: 140 }
+        },
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 10;
+
+      // Add Screenshot
+      if (result.screenshot) {
+        const imgUrl = `${AUTOMATION_API_URL}${result.screenshot}`;
+        const base64Img = await getBase64Image(imgUrl);
+        if (base64Img) {
+          // Calculate aspect ratio to fit image
+          const imgProps = doc.getImageProperties(base64Img);
+          const imgWidth = 140;
+          const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+          if (currentY + imgHeight > 270) {
+            doc.addPage();
+            currentY = 20;
+          }
+
+          doc.addImage(base64Img, 'PNG', 14, currentY, imgWidth, imgHeight);
+          currentY += imgHeight + 15;
+        }
+      } else {
+      doc.setFont('helvetica', 'italic');
+      doc.text('No screenshot available', 14, currentY);
+      currentY += 15;
+      doc.setFont('helvetica', 'normal');
+      }
+    }
+
+    // Footer
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Generated on ${new Date().toLocaleString()} - Page ${i} of ${totalPages}`, pageWidth / 2, 285, { align: 'center' });
+    }
+
+    doc.save(`test-report-${execution.id}.pdf`);
   };
 
   if (loading) {
