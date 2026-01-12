@@ -101,6 +101,9 @@ app.post('/api/tests/execute', async (req, res) => {
       const baseCase: TestCase = {
         name: `Test: ${testFile}`,
         locatorFile: testFile,
+        // Set userType for specific markets/tests to skip login
+        userType: testFile.toLowerCase().includes('salesforce') ? 'CRMAdminQA' : 
+                  testFile.toLowerCase().includes('campaigns') ? 'admin' : undefined,
         testFunction: async (page: any, locators: any) => {
           try {
             // Find the spec file in src/tests

@@ -1,0 +1,12 @@
+{
+  "username": { "selector": "input[name=\"Username\"]", "selectorType": "css" },
+  "password": { "selector": "input[name=\"Password\"]", "selectorType": "css" },
+  "loginBtn": { "selector": "button:has-text(\"LOG IN\")", "selectorType": "css" },
+  "denyallbutton": { "selector": "div.slds-modal__footer.cookie-consent-footer > div > div.slds-col.align-left", "selectorType": "css" },
+  "popupModel": { "selector": "c-cookie-consent > div > section", "selectorType": "css" },
+  "sfusername": { "selector": "#username", "selectorType": "css" },
+  "sfpassword": { "selector": "#password", "selectorType": "css" },
+  "sfLoginBtn": { "selector": "#Login", "selectorType": "css" },
+  "loginTypeDropdown": { "selector": "[data-target-reveals*=\"LoginToNetworkAsUser\"] button", "selectorType": "css" },
+  "loginToFrontend": { "selector": "a:has(span:has-text(\"Log in to Experience as User\"))", "selectorType": "css" }
+}

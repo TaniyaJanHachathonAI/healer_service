@@ -1,0 +1,198 @@
+{
+  "username": {
+    "selector": "#emailAddress",
+    "selectorType": "css"
+  },
+  "password": {
+    "selector": "#loginPassword",
+    "selectorType": "css"
+  },
+  "loginBtn": {
+    "selector": "button[type=\"submit\"]",
+    "selectorType": "css"
+  },
+  "usernameSF": {
+    "selector": "#username",
+    "selectorType": "css"
+  },
+  "passwordSF": {
+    "selector": "#password",
+    "selectorType": "css"
+  },
+  "loginBtnSF": {
+    "selector": "#Login",
+    "selectorType": "css"
+  },
+  "contactList": {
+    "selector": "//tr[contains(@class,\"parent\")]",
+    "selectorType": "xpath"
+  },
+  "contactData": {
+    "selector": "//tr[contains(@class,\"parent\")]//td[@data-label=\"<<attribute>>\"]",
+    "selectorType": "xpath"
+  },
+  "remindMe": {
+    "selector": "a:has-text(\"Remind Me Later\")",
+    "selectorType": "css"
+  },
+  "firstName": {
+    "selector": "input[name=\"First_Name\"]",
+    "selectorType": "css"
+  },
+  "loggedUserName": {
+    "selector": "/span[@class=\"custom-truncate uiOutputText\"]",
+    "selectorType": "xpath"
+  },
+  "inviteCustomerbutton": {
+    "selector": "button[name=\"Contact.RW_Invite_Customer_to_Portal\"]",
+    "selectorType": "css"
+  },
+  "sendSmsbutton": {
+    "selector": "//button[contains(text(),\"Send SMS\")]",
+    "selectorType": "xpath"
+  },
+  "otp": {
+    "selector": "div[class=\"row message_details\"] div span[class=\"btn22cp1\"]",
+    "selectorType": "css"
+  },
+  "appLuncher": {
+    "selector": "button.slds-button",
+    "selectorType": "css"
+  },
+  "search": {
+    "selector": "input[placeholder=\"Search apps and items...\"]",
+    "selectorType": "css"
+  },
+  "accountsTab": {
+    "selector": "a[id=\"Account\"]",
+    "selectorType": "css"
+  },
+  "accountName": {
+    "selector": "//a[@title=\"<<accountName>>\" and contains(@class,\"truncate\")]",
+    "selectorType": "xpath"
+  },
+  "dropDown": {
+    "selector": "lightning-button-menu button[class=\"slds-button slds-button_icon-border-filled fix-slds-button_icon-border-filled slds-button_last\"]",
+    "selectorType": "css"
+  },
+  "loyaltyOption": {
+    "selector": "a[id=\"LoyaltyProgram\"]",
+    "selectorType": "css"
+  },
+  "loyaltyProgram": {
+    "selector": "a[title=\"MAR Loyalty Program\"]",
+    "selectorType": "css"
+  },
+  "contactManage": {
+    "selector": "button[name=\"Account.RW_Manage_Contact\"]",
+    "selectorType": "css"
+  },
+  "memberTab": {
+    "selector": "a[data-label=\"Members\"]",
+    "selectorType": "css"
+  },
+  "MyContact": {
+    "selector": "a[href=\"/lightning/r/0lMVd0000001mPBMAY/view\"]",
+    "selectorType": "css"
+  },
+  "viewMyTransactions": {
+    "selector": "a[class=\"slds-card__footer\"]",
+    "selectorType": "css"
+  },
+  "filter": {
+    "selector": "button[title=\"Show quick filters\"]",
+    "selectorType": "css"
+  },
+  "contentIamgeDiv": {
+    "selector": "div[class=\"contents\"]",
+    "selectorType": "css"
+  },
+  "codeClick": {
+    "selector": "button[aria-label=\"Select country code. Current selection: Morocco (+212)\"]",
+    "selectorType": "css"
+  },
+  "codeOption": {
+    "selector": "button[role=\"option\"]",
+    "selectorType": "css"
+  },
+  "errorMessage": {
+    "selector": "p[class=\"typography-body3 font-regular text-destructive mt-1.5\"]",
+    "selectorType": "css"
+  },
+  "portalNextBtn": {
+    "selector": "button[aria-label=\"Next\"]",
+    "selectorType": "css"
+  },
+  "phoneText": {
+    "selector": "input[id=\"phone-input\"]",
+    "selectorType": "css"
+  },
+  "createRadio": {
+    "selector": "label[class=\"slds-radio__label flow-radio-button-label\"]",
+    "selectorType": "css"
+  },
+  "nextBtn": {
+    "selector": "[class=\"flow-button__NEXT slds-button\"] button",
+    "selectorType": "css"
+  },
+  "createNewAccount": {
+    "selector": "label[class=\"slds-radio__label flow-radio-button-label\"]",
+    "selectorType": "css"
+  },
+  "optionOwner": {
+    "selector": "option[value=\"Role.Owner\"]",
+    "selectorType": "css"
+  },
+  "optionManager": {
+    "selector": "option[value=\"Role.Manager\"]",
+    "selectorType": "css"
+  },
+  "lastName": {
+    "selector": "input[name=\"Last_Name\"]",
+    "selectorType": "css"
+  },
+  "CorrectPhoneNumber": {
+    "selector": "div[type=\"tel\"] input",
+    "selectorType": "css"
+  },
+  "email": {
+    "selector": "input[inputmode=\"email\"]",
+    "selectorType": "css"
+  },
+  "successMsg": {
+    "selector": "span[part=\"formatted-rich-text\"] h2 strong",
+    "selectorType": "css"
+  },
+  "finshBtn": {
+    "selector": "[class=\"flow-button__FINISH slds-button\"]",
+    "selectorType": "css"
+  },
+  "finshBtnForSmsRegistration": {
+    "selector": "button[class=\"slds-button slds-button_brand\"]",
+    "selectorType": "css"
+  },
+  "smsSentText": {
+    "selector": "//lightning-formatted-rich-text[contains(@class,\"slds-text-heading\")]",
+    "selectorType": "xpath"
+  },
+  "contactTab": {
+    "selector": "a[title=\"Contacts\"]",
+    "selectorType": "css"
+  },
+  "invitePortal": {
+    "selector": "button[name=\"Contact.RW_Invite_Customer_to_Portal\"]",
+    "selectorType": "css"
+  },
+  "inviteCustomerViaSms": {
+    "selector": "//button[contains(text(),\"Send SMS\")]",
+    "selectorType": "xpath"
+  },
+  "recentlyViewedField": {
+    "selector": "//span[contains(text(),\"Recently Viewed\")]",
+    "selectorType": "xpath"
+  },
+  "contactNameField": {
+    "selector": "//slot//lightning-formatted-name",
+    "selectorType": "xpath"
+  }
+}
