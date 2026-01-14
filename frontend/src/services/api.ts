@@ -99,8 +99,10 @@ export const apiService = {
   },
 
   // Get failure details
-  getFailure: async (testId: string): Promise<{ testResult: TestResult; payload: FailurePayload; executionId?: string }> => {
-    const response = await automationApi.get(`/api/failures/${testId}`);
+  getFailure: async (testId: string, executionId?: string): Promise<{ testResult: TestResult; payload: FailurePayload; executionId?: string }> => {
+    const response = await automationApi.get(`/api/failures/${testId}`, {
+      params: { executionId }
+    });
     return response.data;
   },
 

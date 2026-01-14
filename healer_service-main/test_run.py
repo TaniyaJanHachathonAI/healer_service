@@ -37,10 +37,10 @@ try:
     #print(dom_data)
     
     payload = {
-        "failed_selector": "card__logomark__wrapper12as3aas pbc-g-elevation-2 a imageasda",
+        "failed_selector": "li.a",
         "html": html,  # Always send HTML
         "semantic_dom": dom_data,
-        "use_of_selector": "click on logomark wraper pepsico",
+        "use_of_selector": "click:Learn about",
         "full_coverage": True,
         "page_url": "https://zookeeper.apache.org/",
         "screenshot_path": SCREENSHOT_PATH,

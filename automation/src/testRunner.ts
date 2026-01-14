@@ -1,14 +1,16 @@
-import { chromium, Browser, Page, BrowserContext } from '@playwright/test';
+import { chromium, Browser, Page, BrowserContext, BrowserContextOptions } from '@playwright/test';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { LocatorManager } from './utils/locatorManager';
 import { FailureCapture } from './utils/failureCapture';
 import { HealerClient } from './utils/healerClient';
+import { AuthUtils } from './utils/authUtils';
 import type { TestResult, TestExecution, FailurePayload } from './types';
 
 export interface TestCase {
   name: string;
   locatorFile: string;
+  userType?: string; // Added userType for session handling
   testFunction: (page: Page, locators: any) => Promise<void>;
 }
 
@@ -19,6 +21,7 @@ export class TestRunner {
   private failureCapture: FailureCapture;
   private healerClient: HealerClient;
   private executionResults: Map<string, TestExecution> = new Map();
+  private currentUserType: string | null = null;
 
   constructor(
     healerApiUrl?: string
@@ -29,38 +32,76 @@ export class TestRunner {
   }
 
   /**
-   * Initialize browser
+   * Initialize browser with optional userType for storage state
    */
-  async initialize(): Promise<void> {
+  async initialize(userType?: string): Promise<void> {
+    this.currentUserType = userType || null;
     const isHeadless = process.env.HEADLESS !== 'false';
     console.log(`Launching browser in ${isHeadless ? 'HEADLESS' : 'HEADED'} mode`);
     
-    this.browser = await chromium.launch({
-      headless: isHeadless,
-    });
-    this.context = await this.browser.newContext({
+    let statePath: string | undefined;
+
+    // Handle session/storage state if userType is provided
+    if (userType) {
+      console.log(`Pre-launch initialization: Executing session flow for ${userType}...`);
+      try {
+        // This will execute the token and session generation flow
+        statePath = await AuthUtils.getStorageState(userType);
+        console.log(`Session state ready at: ${statePath}`);
+      } catch (error) {
+        console.error(`Error during session initialization for ${userType}:`, error);
+        throw error; // Fail early if session cannot be created
+      }
+    }
+
+    if (!this.browser) {
+      this.browser = await chromium.launch({
+        headless: isHeadless,
+      });
+    }
+
+    const contextOptions: BrowserContextOptions = {
       viewport: { width: 1920, height: 1080 },
-    });
+      storageState: statePath, // Use the path we just generated/verified
+    };
+
+    console.log(statePath ? `Applying storage state for user: ${userType}` : 'No storage state applied.');
+    this.context = await this.browser.newContext(contextOptions);
   }
 
   /**
-   * Close browser
+   * Close browser and reset state
    */
   async cleanup(): Promise<void> {
     if (this.context) {
-      await this.context.close();
+      try {
+        await this.context.close();
+      } catch (e) {}
+      this.context = null;
     }
     if (this.browser) {
-      await this.browser.close();
+      try {
+        await this.browser.close();
+      } catch (e) {}
+      this.browser = null;
     }
+
+    // After browser is closed, delete the session file if it was Salesforce
+    if (this.currentUserType === 'CRMAdminQA') {
+      console.log(`Cleaning up session file for ${this.currentUserType}...`);
+      await AuthUtils.removeStorageState(this.currentUserType);
+    }
+    this.currentUserType = null;
   }
 
   /**
    * Run a single test case
    */
   async runTest(testCase: TestCase): Promise<TestResult> {
-    if (!this.context) {
-      await this.initialize();
+    // If context doesn't exist or we have a specific userType requirement, re-initialize
+    if (!this.context || testCase.userType) {
+      if (this.context) await this.context.close();
+      await this.initialize(testCase.userType);
     }
 
     const testId = uuidv4();
@@ -103,10 +144,14 @@ export class TestRunner {
         }
       }
 
-      // 3. Fallback: use the whole error message as context if still empty (not ideal but better than empty)
+      // 3. Fallback: use the whole error message as context if still empty
       if (!failedSelector && errorMessage.length > 5) {
-        console.warn('Could not identify specific failed selector. Using error snippet.');
-        failedSelector = errorMessage.split('\n')[0].substring(0, 100);
+        if (errorMessage.includes('page.goto') || errorMessage.includes('timeout')) {
+          failedSelector = 'Navigation Timeout (Page failed to load)';
+        } else {
+          console.warn('Could not identify specific failed selector. Using error snippet.');
+          failedSelector = errorMessage.split('\n')[0].substring(0, 100);
+        }
       }
 
       const payload = await this.failureCapture.captureFailure(
@@ -176,6 +221,9 @@ export class TestRunner {
     } catch (error) {
       console.error('Error running tests:', error);
       throw error;
+    } finally {
+      // Always cleanup after batch execution
+      await this.cleanup();
     }
   }
 
@@ -202,21 +250,26 @@ export class TestRunner {
     console.log('Waiting 3 seconds before re-executing test...');
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Re-run test
-    const healedResult = await this.runTest(testCase);
+    try {
+      // Re-run test
+      const healedResult = await this.runTest(testCase);
 
-    if (healedResult.status === 'passed') {
-      healedResult.status = 'healed';
-      // Store which locator was used for the pass
-      healedResult.failure = {
-        error: '',
-        payload: failedResult.failure!.payload,
-        healed: true,
-        selectedLocator: selectedSelector
-      };
+      if (healedResult.status === 'passed') {
+        healedResult.status = 'healed';
+        // Store which locator was used for the pass
+        healedResult.failure = {
+          error: '',
+          payload: failedResult.failure!.payload,
+          healed: true,
+          selectedLocator: selectedSelector
+        };
+      }
+
+      return healedResult;
+    } finally {
+      // Cleanup after re-run
+      await this.cleanup();
     }
-
-    return healedResult;
   }
 
   /**

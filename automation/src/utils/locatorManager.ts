@@ -67,21 +67,31 @@ export class LocatorManager {
 
     console.log(`Searching for old selector: "${oldSelector}" in ${fileName}.json`);
 
+    // If they are the same, nothing to do
+    if (oldSelector === newSelector) {
+      console.log('Old and new selectors are identical. Skipping update.');
+      return;
+    }
+
     for (const key in locators) {
       if (locators[key].selector === oldSelector) {
         locators[key].selector = newSelector;
         locators[key].selectorType = newType;
         found = true;
         console.log(`Updated locator key "${key}" in ${fileName}.json (matched by selector value)`);
-        break;
       }
     }
 
     if (!found) {
+      // Check if any key already has the new selector - maybe it was already healed?
+      const alreadyHealed = Object.values(locators).some(l => l.selector === newSelector);
+      if (alreadyHealed) {
+        console.log(`Selector "${newSelector}" already exists in ${fileName}.json. Assuming already healed.`);
+        return;
+      }
+
       console.warn(`No exact match for selector "${oldSelector}" in ${fileName}.json`);
-      // Fallback: if there's only one entry in the file and it's a test file with 1 element, update it anyway?
-      // No, let's be strict but informative.
-      throw new Error(`Could not find locator with value "${oldSelector}" in ${fileName}.json to update.`);
+      throw new Error(`Could not find locator with value "${oldSelector}" in ${fileName}.json. It may have been updated already.`);
     }
 
     this.saveLocators(fileName, locators);

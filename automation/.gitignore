@@ -4,5 +4,7 @@ test-results/
 playwright-report/
 *.log
 .env
+state_*.json
 .DS_Store
 *.tsbuildinfo
+

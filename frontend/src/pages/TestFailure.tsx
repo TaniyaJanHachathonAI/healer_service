@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import apiService from '../services/api';
 import type { FailurePayload, HealingResponse, HealedSelector } from '../types';
 import './TestFailure.css';
@@ -7,6 +7,7 @@ import './TestFailure.css';
 const TestFailure = () => {
   const { testId } = useParams<{ testId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [payload, setPayload] = useState<FailurePayload | null>(null);
   const [healingResponse, setHealingResponse] = useState<HealingResponse | null>(null);
   const [selectedSelector, setSelectedSelector] = useState<string | null>(null);
@@ -15,7 +16,7 @@ const TestFailure = () => {
   const [healing, setHealing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
-  const [executionId, setExecutionId] = useState<string | null>(null);
+  const [executionId, setExecutionId] = useState<string | null>(new URLSearchParams(location.search).get('executionId'));
   const [healerOptions, setHealerOptions] = useState({
     full_coverage: true,
     selector_type: 'mixed' as 'css' | 'xpath' | 'mixed',
@@ -35,9 +36,12 @@ const TestFailure = () => {
     setError(null);
 
     try {
-      const data = await apiService.getFailure(testId);
+      const data = await apiService.getFailure(testId, executionId || undefined);
       setPayload(data.payload);
-      setExecutionId((data as any).executionId || null);
+      
+      if (!executionId && (data as any).executionId) {
+        setExecutionId((data as any).executionId);
+      }
       
       // Construct screenshot URL
       if (data.payload.screenshot_path) {
