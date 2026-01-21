@@ -15,7 +15,7 @@ print("HEALER SERVICE - API TEST")
 print("=" * 80)
 
 # Configuration
-API_URL = "http://127.0.0.1:8000/heal"
+API_URL = "http://0.0.0.0:9001/heal"
 SAMPLE_HTML_PATH = "sample_data/zookeeper.html"
 SCREENSHOT_PATH = "sample_data/zookeeper.png"
 
@@ -37,10 +37,10 @@ try:
     #print(dom_data)
     
     payload = {
-        "failed_selector": "li.a",
+        "failed_selector": "card__logomark__wrapper12as3aas pbc-g-elevation-2 a imageasda",
         "html": html,  # Always send HTML
         "semantic_dom": dom_data,
-        "use_of_selector": "click:Learn about",
+        "use_of_selector": "click on logomark wraper pepsico",
         "full_coverage": True,
         "page_url": "https://zookeeper.apache.org/",
         "screenshot_path": SCREENSHOT_PATH,
