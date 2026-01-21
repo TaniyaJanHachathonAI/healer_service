@@ -71,26 +71,28 @@ try:
         print(f"   {result.get('chosen', 'N/A')}")
         
         print(f"\nConfidence Score:")
-        if result.get('confidence_scores'):
-            print(f"   {result['confidence_scores'][0]:.2f}")
+        # First candidate score
+        if result.get('candidates'):
+            print(f"   {result['candidates'][0]['score']:.2f}")
         else:
             print(f"   N/A")
         
         print(f"\n Processing Time:")
-        metadata = result.get('metadata', {})
-        print(f"   {metadata.get('processing_time_ms', 0):.2f}ms")
+        debug = result.get('debug', {})
+        print(f"   {debug.get('processing_time_ms', 0):.2f}ms")
         
         print(f"\n Metadata:")
-        print(f"   LLM Used: {metadata.get('llm_used', 'N/A')}")
-        print(f"   Screenshot Analyzed: {metadata.get('screenshot_analyzed', False)}")
-        print(f"   Total Candidates: {metadata.get('total_candidates_generated', 'N/A')}")
+        debug = result.get('debug', {})
+        print(f"   LLM Used: {debug.get('llm_used', 'N/A')}")
+        print(f"   Screenshot Analyzed: {debug.get('screenshot_analyzed', False)}")
+        print(f"   Total Candidates: {debug.get('total_candidates', 'N/A')}")
         
         print(f"\nTop 5 Candidates:")
         candidates = result.get('candidates', [])
-        confidence_scores = result.get('confidence_scores', [])
-        for i, (selector, confidence) in enumerate(zip(candidates[:5], confidence_scores[:5]), 1):
-            print(f"   {i}. {selector}")
-            print(f"      Confidence: {confidence:.2f}")
+        for i, c in enumerate(candidates[:5], 1):
+            print(f"   {i}. {c['selector']}")
+            print(f"      Score: {c['score']:.2f}")
+            print(f"      Base Score: {c['base_score']:.2f}")
         
         print(f"\n Healing ID: {result.get('healing_id', 'N/A')}")
         print(f" Request ID: {result.get('request_id', 'N/A')}")
