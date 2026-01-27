@@ -98,20 +98,27 @@ class FeedbackRequest(BaseModel):
 class SelectorCandidate(BaseModel):
     """A single selector candidate with metadata"""
     selector: str
-    confidence: float = Field(..., ge=0.0, le=1.0)
-    selector_type: SelectorType
-    stability_score: float = Field(..., ge=0.0, le=1.0)
-    semantic_score: float = Field(..., ge=0.0, le=1.0)
+    score: float = Field(..., ge=0.0, le=1.0)
+    base_score: float = Field(..., ge=0.0, le=1.0)
+    attribute_score: float = Field(..., ge=0.0, le=1.0)
+    tag: Optional[str] = None
+    text: Optional[str] = None
+    xpath: Optional[str] = None
+    
+    # Optional fields for backward compat or extra info if needed, but keeping it strict to request for now
+    # selector_type: SelectorType # Removing as not in user request example, or make optional
 
 class HealResponse(BaseModel):
     """Response model for healing request"""
     request_id: Optional[str] = Field(None, description="Unique request ID for tracking")
-    candidates: List[str] = Field(..., description="List of candidate selectors")
-    confidence_scores: List[float] = Field(..., description="Confidence scores for each candidate")
-    chosen: Optional[str] = Field(None, description="The top recommended selector")
     message: str = Field(..., description="Status message")
-    healing_id: Optional[int] = Field(None, description="Database ID of the healing record")
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional metadata")
+    chosen: Optional[str] = Field(None, description="The top recommended selector")
+    candidates: List[SelectorCandidate] = Field(..., description="List of candidate selectors")
+    # confidence_scores: List[float] # Removed as it's part of candidate object now
+    debug: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Debug information")
+    # healing_id: Optional[int] # Removed or optional? User example didn't show it but it might be useful. 
+    # The user request example excludes healing_id and metadata (renamed to debug). 
+    # I will keep healing_id as optional but place debug as requested.
     
     class Config:
         schema_extra = {

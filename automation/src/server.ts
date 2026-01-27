@@ -101,6 +101,9 @@ app.post('/api/tests/execute', async (req, res) => {
       const baseCase: TestCase = {
         name: `Test: ${testFile}`,
         locatorFile: testFile,
+        // Set userType for specific markets/tests to skip login
+        userType: testFile.toLowerCase().includes('salesforce') ? 'CRMAdminQA' : 
+                  testFile.toLowerCase().includes('campaigns') ? 'admin' : undefined,
         testFunction: async (page: any, locators: any) => {
           try {
             // Find the spec file in src/tests
@@ -206,8 +209,36 @@ app.get('/api/tests/execution/:id', (req, res) => {
  */
 app.get('/api/failures/:testId', (req, res) => {
   const { testId } = req.params;
-  const execution = Array.from(activeExecutions.values())
-    .find(e => e.results.some(r => r.id === testId));
+  const { executionId } = req.query;
+
+  let execution: TestExecution | undefined;
+
+  // 1. If executionId provided, look for it specifically
+  if (executionId) {
+    execution = activeExecutions.get(executionId as string) || loadReport(executionId as string) || undefined;
+  }
+
+  // 2. If not found or not provided, search all active executions
+  if (!execution) {
+    execution = Array.from(activeExecutions.values())
+      .find(e => e.results.some(r => r.id === testId));
+  }
+
+  // 3. Fallback: search all saved reports on disk if not in memory
+  if (!execution) {
+    try {
+      const files = fs.readdirSync(REPORTS_DIR).filter(f => f.endsWith('.json'));
+      for (const file of files) {
+        const report = JSON.parse(fs.readFileSync(path.join(REPORTS_DIR, file), 'utf-8'));
+        if (report.results.some((r: any) => r.id === testId)) {
+          execution = report;
+          break;
+        }
+      }
+    } catch (e) {
+      console.error('Error searching reports on disk:', e);
+    }
+  }
 
   if (!execution) {
     return res.status(404).json({ error: 'Test result not found' });
@@ -307,7 +338,17 @@ app.post('/api/tests/heal-and-rerun', async (req, res) => {
     
     // If not in memory (server restart), try to reconstruct from report on disk
     if (!testCases) {
-      const savedExecution = loadReport(executionId.replace(/^re-/, '')); // strip re- prefix if any
+      console.log(`Execution ${executionId} not found in memory, searching on disk...`);
+      // Strip ALL re- prefixes to find the original report if necessary, 
+      // but first try the exact name.
+      let savedExecution = loadReport(executionId);
+      
+      if (!savedExecution && executionId.includes('re-')) {
+        const originalId = executionId.split('-').pop()!;
+        console.log(`Trying original execution ID: ${originalId}`);
+        savedExecution = loadReport(originalId);
+      }
+
       if (savedExecution) {
         console.log(`Reconstructing test cases for execution ${executionId} from saved report`);
         const reconstructedCases: TestCase[] = savedExecution.results.map(r => ({
@@ -327,7 +368,7 @@ app.post('/api/tests/heal-and-rerun', async (req, res) => {
             }
 
             if (!actualFile) {
-              throw new Error(`Test logic file for "${testFile}" not found. Please ensure it exists in ${testDir}`);
+              throw new Error(`Test logic file for "${testFile}" not found in ${testDir}`);
             }
 
             const testPath = path.join(testDir, actualFile);
@@ -346,7 +387,12 @@ app.post('/api/tests/heal-and-rerun', async (req, res) => {
       }
     }
 
-    const testCase = testCases?.find(tc => tc.name === failedResult.testName);
+    if (!testCases) {
+      console.error(`Could not find or reconstruct test cases for execution ${executionId}`);
+      return res.status(404).json({ error: 'Execution history lost. Please run the test again from the execution page.' });
+    }
+
+    const testCase = testCases.find(tc => tc.name === failedResult.testName);
 
     if (!testCase) {
       return res.status(404).json({ error: 'Test case logic not found for re-execution' });

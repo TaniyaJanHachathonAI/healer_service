@@ -208,7 +208,7 @@ const TestExecution = () => {
                   {result.failure && (
                     <button
                       className="btn btn-small btn-primary"
-                      onClick={() => navigate(`/test-failures/${result.id}`)}
+                      onClick={() => navigate(`/test-failures/${result.id}?executionId=${execution.id}`)}
                     >
                       View Details
                     </button>
